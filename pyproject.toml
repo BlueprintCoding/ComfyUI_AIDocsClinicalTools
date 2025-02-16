@@ -1,0 +1,15 @@
+[project]
+name = "The AI Doctor's Clinical Tools"
+description = "Nodes: Multi Int and Multi Text; allows for the creation of multiple int and multiple string storage and output from a single node. Multi Float coming soon."
+version = "1.0"
+license = {file = "LICENSE"}
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/SKBv0/ComfyUI_SKBundle"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = "theAIDoc"
+DisplayName = "ComfyUI_AIDocsClinicalTools"
+Icon = ""
