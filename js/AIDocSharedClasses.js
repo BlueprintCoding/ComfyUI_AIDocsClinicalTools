@@ -43,9 +43,20 @@ export class SettingsPopup {
         this.popupElement.appendChild(this.contentContainer);
     }
 
-    open(x, y) {
-        this.popupElement.style.left = x + "px";
-        this.popupElement.style.top = y + "px";
+
+    open() {
+        // Center the popup in the viewport
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        const popupWidth = this.popupElement.offsetWidth;
+        const popupHeight = this.popupElement.offsetHeight;
+
+        const left = (windowWidth - popupWidth) / 2;
+        const top = (windowHeight - popupHeight) / 2 - 100;
+
+        this.popupElement.style.left = `${left}px`;
+        this.popupElement.style.top = `${top}px`;
+
         document.body.appendChild(this.popupElement);
 
         // Outside click to close

@@ -1,6 +1,31 @@
 import { app } from "../../../scripts/app.js";
 import { SettingsPopup } from "./AIDocSharedClasses.js";
 
+function calculateLuminance(hexColor) {
+    // Remove the hash at the start if it's there
+    hexColor = hexColor.replace(/^#/, '');
+
+    // Parse RGB components
+    const r = parseInt(hexColor.substring(0, 2), 16) / 255;
+    const g = parseInt(hexColor.substring(2, 4), 16) / 255;
+    const b = parseInt(hexColor.substring(4, 6), 16) / 255;
+
+    // Convert to luminance based on sRGB formula
+    const a = [r, g, b].map(function (x) {
+        return (x <= 0.03928) ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+    });
+
+    // Return luminance (perceived brightness)
+    return (a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722);
+}
+
+function getTextColorForBackground(bgColor) {
+    const luminance = calculateLuminance(bgColor);
+
+    // If luminance is less than 0.5, use white text (light text for dark backgrounds)
+    return luminance < 0.5 ? '#ffffff' : '#000000';  // White for dark background, black for light
+}
+
 class MultiIntNode {
     constructor(node) {
         this.node = node;
@@ -9,8 +34,9 @@ class MultiIntNode {
         if (typeof node.properties.activeCount !== "number") {
             node.properties.activeCount = 5;
         }
-        if (typeof node.properties.intStep !== "number") {
-            node.properties.intStep = 1;
+        // We'll use an array for per–row step values.
+        if (!Array.isArray(node.properties.intSteps)) {
+            node.properties.intSteps = [];
         }
         if (!Array.isArray(node.properties.labels)) {
             node.properties.labels = [];
@@ -83,17 +109,34 @@ class MultiIntNode {
         }
         this.node.size[1] = totalHeight;
     
-        // Draw node background (#181818)
-        ctx.fillStyle = "#181818";
-        ctx.fillRect(0, 0, this.node.size[0], this.node.size[1]);
-    
+        // Use the color stored in bgColor, or fallback to the default color
+        const bgColor = this.node.properties.bgColor || "#181818";  // Default color
+        ctx.fillStyle = bgColor;
+
+        // Draw a background with rounded bottom corners
+        const radius = 8;  // Adjust the radius to control the roundness of the corners
+        ctx.beginPath();
+        // Top-left corner
+        ctx.moveTo(0, 0); 
+        ctx.lineTo(this.node.size[0], 0); // Top edge
+        ctx.lineTo(this.node.size[0], this.node.size[1] - radius); // Right edge (top to bottom, leaving space for bottom rounded corner)
+        ctx.arcTo(this.node.size[0], this.node.size[1], this.node.size[0] - radius, this.node.size[1], radius); // Bottom-right corner
+        ctx.lineTo(radius, this.node.size[1]);  // Bottom edge (right to left)
+        ctx.arcTo(0, this.node.size[1], 0, this.node.size[1] - radius, radius); // Bottom-left corner
+        ctx.lineTo(0, radius); // Left edge (bottom to top)
+        ctx.closePath();
+        ctx.fill();
+
         // Row backgrounds
-        const rowBgWidth = this.node.size[0] - margin - 48; // Reserve space for outputs
+        const rowBgWidth = this.node.size[0] - margin - 38; // Reserve space for outputs
         this.labelRects = [];
         this.valueRects = [];
         this.pencilRects = [];
         this.incrementRects = [];
         this.decrementRects = [];
+
+        const rowBgColor = this.node.properties.rowBgColor || "#121212";
+        const rowTextColor = getTextColorForBackground(rowBgColor) || '#fff';
     
         let y = margin;
         for (let i = 0; i < count; i++) {
@@ -101,7 +144,7 @@ class MultiIntNode {
             // Set the radius for the rounded corners
             const radius = 5;  // Adjust as needed
             // Row background with rounded corners
-            ctx.fillStyle = "#444";
+            ctx.fillStyle = rowBgColor;
             ctx.beginPath();
             // Top-left corner
             ctx.moveTo(margin + radius, y);  
@@ -116,7 +159,7 @@ class MultiIntNode {
             ctx.closePath();
             ctx.fill();
             // Static label (left) - e.g., i1, i2, i3, etc.
-            ctx.fillStyle = "#7d7d7d";
+            ctx.fillStyle = rowTextColor;
             ctx.font = "12px Arial";
             ctx.textBaseline = "middle";
             ctx.textAlign = "left";
@@ -132,7 +175,7 @@ class MultiIntNode {
             const lineEndY = lineStartY + rowHeight;  // End after the row height (making the line same length as row)
 
             // Set the line color
-            ctx.strokeStyle = "#7d7d7d";  // Same color as label for consistency
+            ctx.strokeStyle = rowTextColor;  // Same color as label for consistency
             ctx.lineWidth = 1;  // Line thickness
 
             ctx.beginPath();
@@ -141,7 +184,7 @@ class MultiIntNode {
             ctx.stroke();  // Actually draw the line
 
             // Custom label (right of static label) - e.g., INT 1, INT 2, etc.
-            ctx.fillStyle = "#fff";
+            ctx.fillStyle = rowTextColor;
             ctx.font = "14px Arial";
             const customLabel = this.node.properties.labels[i] || `INT ${i + 1}`;
             const customLabelMetrics = ctx.measureText(customLabel);
@@ -172,7 +215,7 @@ class MultiIntNode {
     
             // Pencil icon
             ctx.textAlign = "left";
-            ctx.fillStyle = "#ccc";
+            ctx.fillStyle = rowTextColor;
             ctx.font = "16px Arial";
             const pencilIcon = "✎";
             const pencilMetrics = ctx.measureText(pencilIcon);
@@ -192,8 +235,11 @@ class MultiIntNode {
             const buttonBoxWidth = 20;     // Fixed width for the button box
             const buttonBoxHeight = 20;    // Fixed height for the button box
 
+            const incDecColor = this.node.properties.buttonColor || "#4b3e72";  // Default color
+            const textColor = getTextColorForBackground(incDecColor);  // Get text color based on the background
+
             // Set the background color for the increment button box
-            ctx.fillStyle = "#4b3e72";  // Purple background
+            ctx.fillStyle = incDecColor;  // Purple background
             ctx.beginPath();
             ctx.moveTo(incrementButtonBoxX + 5, incrementButtonBoxY); // Top-left corner
             ctx.arcTo(incrementButtonBoxX + buttonBoxWidth, incrementButtonBoxY, incrementButtonBoxX + buttonBoxWidth, incrementButtonBoxY + buttonBoxHeight, 5); // Top-right corner
@@ -206,7 +252,7 @@ class MultiIntNode {
             // Draw Increment Button (+)
             const incrementButton = "+";
             ctx.font = "12px Arial";  // Smaller font size for the button text
-            ctx.fillStyle = "#fff"; // White color for the text inside the button
+            ctx.fillStyle = textColor; // White color for the text inside the button
             ctx.fillText(incrementButton, incrementButtonBoxX + 6, incrementButtonBoxY + buttonBoxHeight / 2); // Draw + button in the middle
 
             // Create a fixed-size rounded box for the decrement (-) button
@@ -214,7 +260,7 @@ class MultiIntNode {
             const decrementButtonBoxY = incrementButtonBoxY;  // Same Y position as the + button box
 
             // Set the background color for the decrement button box
-            ctx.fillStyle = "#4b3e72";  // Purple background
+            ctx.fillStyle = incDecColor;  // Purple background
             ctx.beginPath();
             ctx.moveTo(decrementButtonBoxX + 5, decrementButtonBoxY); // Top-left corner
             ctx.arcTo(decrementButtonBoxX + buttonBoxWidth, decrementButtonBoxY, decrementButtonBoxX + buttonBoxWidth, decrementButtonBoxY + buttonBoxHeight, 5); // Top-right corner
@@ -227,7 +273,7 @@ class MultiIntNode {
             // Draw Decrement Button (-)
             const decrementButton = "-";
             ctx.font = "12px Arial";  // Smaller font size for the button text
-            ctx.fillStyle = "#fff"; // White color for the text inside the button
+            ctx.fillStyle = textColor; // White color for the text inside the button
             ctx.fillText(decrementButton, decrementButtonBoxX + 8, decrementButtonBoxY + buttonBoxHeight / 2); // Draw - button in the middle
 
             // Save button areas for interaction detection (with separate button box positions)
@@ -280,7 +326,7 @@ class MultiIntNode {
         this.dragIndex = index;
         this.dragInitialX = initialEvent.clientX;
         this.dragInitialValue = this.node.properties.values[index];
-        const step = this.node.properties.intStep || 1;
+        const step = (this.node.properties.intSteps && this.node.properties.intSteps[index]) || 1;
         const sensitivity = 10; // pixels per step change
         
         // Get the canvas element.
@@ -313,9 +359,9 @@ class MultiIntNode {
         // Attach the global click handler with capture so it fires before other click handlers.
         document.addEventListener("click", this._onGlobalClickToStop, { capture: true });
         
-        // Also attach a keydown handler on the document so that Enter or Esc stop drag mode.
+        // Also attach a keydown handler on the document so that Enter stop drag mode.
         this._onKeyDownToStop = (e) => {
-          if (e.key === "Enter" || e.key === "Escape") {
+          if (e.key === "Enter") {
             console.log("Keydown (" + e.key + ") detected—stopping drag");
             this.stopValueDrag();
           }
@@ -536,111 +582,238 @@ class MultiIntNode {
         this.populateGearPopup(popup);  // <-- same logic
     }
 
-    populateGearPopup(popup) {
-        const content = popup.getContentContainer();
-        popup.clearContent(); // no stale content
-    
-        // "Add/Remove Ints" label
-        const addRemoveLabel = document.createElement("div");
-        addRemoveLabel.textContent = "Add/Remove Ints";
-        addRemoveLabel.style.color = "#fff";
-        addRemoveLabel.style.fontSize = "12px";
-        addRemoveLabel.style.textAlign = "center";
-        content.appendChild(addRemoveLabel);
-    
-        // Button row
-        const buttonRow = document.createElement("div");
-        buttonRow.style.display = "flex";
-        buttonRow.style.justifyContent = "center"; // Centering buttons
-        buttonRow.style.alignItems = "center";
-        buttonRow.style.width = "100%";
-        buttonRow.style.gap = "10px";  // Reduced space between the buttons
-        content.appendChild(buttonRow);
-    
-        const minusBtn = document.createElement("button");
-        minusBtn.textContent = "-";
-        minusBtn.style.background = "#333";
-        minusBtn.style.color = "#fff";
-        minusBtn.style.padding = "3px 10px";  // Set fixed padding for size consistency
-        minusBtn.style.fontSize = "16px";
-        buttonRow.appendChild(minusBtn);
-    
-        const plusBtn = document.createElement("button");
-        plusBtn.textContent = "+";
-        plusBtn.style.background = "#333";
-        plusBtn.style.color = "#fff";
-        plusBtn.style.padding = "3px 6px";  // Set fixed padding for size consistency
-        plusBtn.style.fontSize = "16px";
-        buttonRow.appendChild(plusBtn);
-    
-        // Steps label
-        const stepsLabel = document.createElement("div");
-        stepsLabel.textContent = "Steps";
-        stepsLabel.style.color = "#fff";
-        stepsLabel.style.fontSize = "12px";
-        stepsLabel.style.textAlign = "center";
-        content.appendChild(stepsLabel);
-    
-        // Steps input
-        const stepsInput = document.createElement("input");
-        stepsInput.type = "number";
-        stepsInput.value = this.node.properties.intStep.toString();
-        stepsInput.min = "1";
-        stepsInput.step = "1";
-        stepsInput.style.background = "#333";
-        stepsInput.style.color = "#fff";
-        content.appendChild(stepsInput);
-    
-        // Steps input change
-        stepsInput.addEventListener("change", () => {
-            const val = parseInt(stepsInput.value, 10);
-            if (!isNaN(val) && val >= 1) {
-                this.node.properties.intStep = val;
-            } else {
-                stepsInput.value = this.node.properties.intStep.toString();
-            }
-        });
-    
-        // minus logic
-        minusBtn.addEventListener("click", (evt) => {
-            evt.stopPropagation();
-            
-            // Save current width
-            const currentWidth = this.node.size[0];
-    
-            if (this.node.properties.activeCount > 1) {
-                this.node.properties.activeCount = Math.max(1, this.node.properties.activeCount - 1);
-                this.adjustArrays();
-                this.setupOutputsAndWidgets();
-                this.node.setDirtyCanvas(true, true);
-                
-                // Reset width after updating active count
-                this.node.size[0] = currentWidth;
-                this.node.setDirtyCanvas(true, true);
-                setTimeout(() => popup.reposition(this.node.htmlElement, 10, 10), 50);
-            }
-        });
-    
-        // plus logic
-        plusBtn.addEventListener("click", (evt) => {
-            evt.stopPropagation();
-    
-            // Save current width
-            const currentWidth = this.node.size[0];
-    
-            if (this.node.properties.activeCount < 20) {
-                this.node.properties.activeCount = Math.min(20, this.node.properties.activeCount + 1);
-                this.adjustArrays();
-                this.setupOutputsAndWidgets();
-                this.node.setDirtyCanvas(true, true);
-    
-                // Reset width after updating active count
-                this.node.size[0] = currentWidth;
-                this.node.setDirtyCanvas(true, true);
-                setTimeout(() => popup.reposition(this.node.htmlElement, 10, 10), 50);
-            }
-        });
-    }
+ // ----------------- Gear Popup: Node Settings -----------------
+ populateGearPopup(popup) {
+    const content = popup.getContentContainer();
+    popup.clearContent();
+
+    // Apply max height, vertical scroll, and thin scrollbar to content
+    content.style.maxHeight = "300px";
+    content.style.overflowY = "auto";
+    content.style.scrollbarWidth = "thin";  // Firefox: Thin scrollbar
+    content.style.setProperty("::-webkit-scrollbar", "width: 6px; height: 6px;");
+    content.style.setProperty("::-webkit-scrollbar-thumb", "background-color: #4b3e72; border-radius: 10px;");
+    content.style.setProperty("::-webkit-scrollbar-track", "background-color: #181818; border-radius: 10px;");
+
+    // "Add/Remove Ints" label and buttons (existing code)
+    const addRemoveLabel = document.createElement("div");
+    addRemoveLabel.textContent = "Add/Remove Ints";
+    addRemoveLabel.style.color = "#fff";
+    addRemoveLabel.style.fontSize = "12px";
+    addRemoveLabel.style.textAlign = "center";
+    content.appendChild(addRemoveLabel);
+
+    const buttonRow = document.createElement("div");
+    buttonRow.style.display = "flex";
+    buttonRow.style.justifyContent = "center";
+    buttonRow.style.alignItems = "center";
+    buttonRow.style.width = "100%";
+    buttonRow.style.gap = "10px";
+    buttonRow.style.marginTop = "-5px";
+    content.appendChild(buttonRow);
+
+    const minusBtn = document.createElement("button");
+    minusBtn.textContent = "-";
+    minusBtn.style.background = "#333";
+    minusBtn.style.color = "#fff";
+    minusBtn.style.padding = "0px 12px";
+    minusBtn.style.fontSize = "16px";
+    buttonRow.appendChild(minusBtn);
+
+    const plusBtn = document.createElement("button");
+    plusBtn.textContent = "+";
+    plusBtn.style.background = "#333";
+    plusBtn.style.color = "#fff";
+    plusBtn.style.padding = "0px 8px";
+    plusBtn.style.fontSize = "16px";
+    buttonRow.appendChild(plusBtn);
+
+    const stepsLabel = document.createElement("div");
+    stepsLabel.textContent = "Steps";
+    stepsLabel.style.color = "#fff";
+    stepsLabel.style.fontSize = "12px";
+    stepsLabel.style.textAlign = "center";
+    content.appendChild(stepsLabel);
+
+    // Create a container for the steps input
+    const stepsContainer = document.createElement("div");
+    stepsContainer.style.cssText = `
+        margin-top:-5px;
+        background: #131313;
+        padding-top: 5px;
+        padding-bottom: 5px;
+        min-height: 100px;
+        width: 95%;
+        overflow-y: auto;
+        scrollbar-width: thin;
+    `;
+    stepsContainer.style.setProperty("::-webkit-scrollbar", "width: 6px; height: 6px;");
+    stepsContainer.style.setProperty("::-webkit-scrollbar-thumb", "background-color: #4b3e72; border-radius: 10px;");
+    stepsContainer.style.setProperty("::-webkit-scrollbar-track", "background-color: #181818; border-radius: 10px;");
+    content.appendChild(stepsContainer);
+
+
+
+    const stepsList = document.createElement("div");
+    stepsContainer.appendChild(stepsList);
+
+    // Update the steps inputs based on activeCount
+    const updateStepInputs = () => {
+        // Clear existing steps
+        stepsList.innerHTML = '';
+
+        // Add the step inputs based on activeCount
+        for (let i = 0; i < this.node.properties.activeCount; i++) {
+            const stepDiv = document.createElement("div");
+            stepDiv.style.display = "flex";
+            stepDiv.style.justifyContent = "center";
+            stepDiv.style.marginBottom = "5px";
+            stepDiv.style.paddingBottom = "2px";
+            stepDiv.style.borderBottom = "2px solid #262626";
+
+            const intLabel = document.createElement("span");
+            intLabel.textContent = `i${i + 1}`;
+            intLabel.style.color = "#fff";
+            intLabel.style.fontSize = "14px";
+            intLabel.style.marginRight = "2px";
+            intLabel.style.marginTop = "2px";
+
+            const stepInput = document.createElement("input");
+            stepInput.type = "number";
+            stepInput.value = this.node.properties.intSteps[i] || 1;
+            stepInput.min = "1";
+            stepInput.style.width = "60px";
+            stepInput.style.fontSize = "12px";
+            stepInput.style.background = "#333";
+            stepInput.style.color = "#fff";
+            stepInput.style.border = "2px solid #4b3e72";
+            stepInput.style.borderRadius = "6px";
+            stepInput.style.textAlign = "center";
+
+            stepInput.addEventListener("change", () => {
+                const newStep = parseInt(stepInput.value, 10);
+                if (!isNaN(newStep) && newStep >= 1) {
+                    this.node.properties.intSteps[i] = newStep;
+                } else {
+                    stepInput.value = this.node.properties.intSteps[i] || 1;
+                }
+            });
+
+            stepDiv.appendChild(intLabel);
+            stepDiv.appendChild(stepInput);
+            stepsList.appendChild(stepDiv);
+        }
+    };
+
+    // Initial update of step inputs
+    updateStepInputs();
+
+    // ---------------------------- Node Background Color Picker ----------------------------
+    const bgColorLabel = document.createElement("div");
+    bgColorLabel.textContent = "Node Background Color";
+    bgColorLabel.style.color = "#fff";
+    bgColorLabel.style.fontSize = "12px";
+    bgColorLabel.style.textAlign = "center";
+    content.appendChild(bgColorLabel);
+
+    const colorPicker = document.createElement("input");
+    colorPicker.type = "color";
+    colorPicker.value = this.node.properties.bgColor || "#181818"; 
+    colorPicker.style.marginTop = "-5px";
+    colorPicker.style.minHeight = "25px"; // This ensures a minimum height
+    colorPicker.style.width = "100%";
+    colorPicker.style.marginBottom = "0px";
+    content.appendChild(colorPicker);
+
+    colorPicker.addEventListener("input", (e) => {
+        const selectedColor = e.target.value;
+        this.node.properties.bgColor = selectedColor;  
+        this.node.setDirtyCanvas(true, true);  
+    });
+
+    // ---------------------------- Row Background Color Picker ----------------------------
+
+    const rowBgColorLabel = document.createElement("div");
+    rowBgColorLabel.textContent = "Row Background Color";
+    rowBgColorLabel.style.color = "#fff";
+    rowBgColorLabel.style.fontSize = "12px";
+    rowBgColorLabel.style.textAlign = "center";
+    content.appendChild(rowBgColorLabel);
+
+    const rowBgColorPicker = document.createElement("input");
+    rowBgColorPicker.type = "color";
+    rowBgColorPicker.value = this.node.properties.rowBgColor || "#121212"; 
+    rowBgColorPicker.style.marginTop = "-5px";
+    rowBgColorPicker.style.minHeight = "25px"; // This ensures a minimum height
+    rowBgColorPicker.style.width = "100%";
+    rowBgColorPicker.style.marginBottom = "0px";
+    content.appendChild(rowBgColorPicker);
+
+    rowBgColorPicker.addEventListener("input", (e) => {
+        const selectedColor = e.target.value;
+        this.node.properties.rowBgColor = selectedColor;
+        this.node.setDirtyCanvas(true, true);  
+    });
+
+    // ---------------------------- Increment/Decrement Button Color Picker ----------------------------
+
+    const buttonColorLabel = document.createElement("div");
+    buttonColorLabel.textContent = "Int +/- Button Color";
+    buttonColorLabel.style.color = "#fff";
+    buttonColorLabel.style.fontSize = "12px";
+    buttonColorLabel.style.textAlign = "center";
+    content.appendChild(buttonColorLabel);
+
+    const buttonColorPicker = document.createElement("input");
+    buttonColorPicker.type = "color";
+    buttonColorPicker.value = this.node.properties.buttonColor || "#4b3e72"; 
+    buttonColorPicker.style.marginTop = "-5px";
+    buttonColorPicker.style.minHeight = "25px"; // This ensures a minimum height
+    buttonColorPicker.style.width = "100%";
+    buttonColorPicker.style.marginBottom = "0px";
+    content.appendChild(buttonColorPicker);
+
+    buttonColorPicker.addEventListener("input", (e) => {
+        const selectedButtonColor = e.target.value;
+        this.node.properties.buttonColor = selectedButtonColor;  
+        this.node.setDirtyCanvas(true, true);  
+    });
+
+    // minus logic
+    minusBtn.addEventListener("click", (evt) => {
+        evt.stopPropagation();
+        const currentWidth = this.node.size[0];
+
+        if (this.node.properties.activeCount > 1) {
+            this.node.properties.activeCount = Math.max(1, this.node.properties.activeCount - 1);
+            this.adjustArrays();  // Update intSteps and other arrays
+            updateStepInputs();  // Update the step inputs in the UI
+            this.node.setDirtyCanvas(true, true);
+
+            this.node.size[0] = currentWidth;
+            this.node.setDirtyCanvas(true, true);
+            setTimeout(() => popup.reposition(this.node.htmlElement, 10, 10), 50);
+        }
+    });
+
+    // plus logic
+    plusBtn.addEventListener("click", (evt) => {
+        evt.stopPropagation();
+        const currentWidth = this.node.size[0];
+
+        if (this.node.properties.activeCount < 20) {
+            this.node.properties.activeCount = Math.min(20, this.node.properties.activeCount + 1);
+            this.adjustArrays();  // Update intSteps and other arrays
+            updateStepInputs();  // Update the step inputs in the UI
+            this.node.setDirtyCanvas(true, true);
+
+            this.node.size[0] = currentWidth;
+            this.node.setDirtyCanvas(true, true);
+            setTimeout(() => popup.reposition(this.node.htmlElement, 10, 10), 50);
+        }
+    });
+}
+
     
     createGearPopupFallback(x, y) {
         const popup = new SettingsPopup(this.node);
@@ -752,50 +925,46 @@ class MultiIntNode {
     }
 
     incrementValue(index) {
-        const step = this.node.properties.intStep || 1;
-        // Increase the value at the given index
+        // Use per–row step value.
+        const step = (this.node.properties.intSteps && this.node.properties.intSteps[index]) || 1;
         this.node.properties.values[index] += step;
-        
-        // Update the corresponding widget (so it gets updated on UI as well)
         if (this.node.widgets[index]) {
-            this.node.widgets[index].value = this.node.properties.values[index];
+          this.node.widgets[index].value = this.node.properties.values[index];
         }
-        
-        // Mark the canvas as dirty so it gets redrawn with the new value
         this.node.setDirtyCanvas(true, true);
-    }
-    
-    decrementValue(index) {
-        const step = this.node.properties.intStep || 1;
-        // Decrease the value at the given index
+      }
+      
+      decrementValue(index) {
+        const step = (this.node.properties.intSteps && this.node.properties.intSteps[index]) || 1;
         this.node.properties.values[index] -= step;
-        
-        // Update the corresponding widget (so it gets updated on UI as well)
         if (this.node.widgets[index]) {
-            this.node.widgets[index].value = this.node.properties.values[index];
+          this.node.widgets[index].value = this.node.properties.values[index];
         }
-        
-        // Mark the canvas as dirty so it gets redrawn with the new value
         this.node.setDirtyCanvas(true, true);
-    }
-    
-
-    onValueChanged(index, val) {
-        this.node.properties.values[index] = parseInt(val, 10) || 0;
-        this.node.setDirtyCanvas(true, true);
-    }
-
+      }
+    // Ensure that labels, values, and intSteps arrays have exactly activeCount elements.
     adjustArrays() {
         const count = this.node.properties.activeCount;
+    
+        // Adjust labels
         while (this.node.properties.labels.length < count) {
             this.node.properties.labels.push(`i${this.node.properties.labels.length + 1}`);
         }
         this.node.properties.labels.length = count;
+    
+        // Adjust values
         while (this.node.properties.values.length < count) {
             this.node.properties.values.push(0);
         }
         this.node.properties.values.length = count;
+    
+        // Adjust intSteps
+        while (this.node.properties.intSteps.length < count) {
+            this.node.properties.intSteps.push(1);  // Default step value
+        }
+        this.node.properties.intSteps.length = count;
     }
+    
 
 }
 

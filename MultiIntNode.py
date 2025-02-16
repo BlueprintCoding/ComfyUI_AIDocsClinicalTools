@@ -41,4 +41,4 @@ class MultiInt:
 
 
 NODE_CLASS_MAPPINGS = {"MultiInt": MultiInt}
-NODE_DISPLAY_NAME_MAPPINGS = {"MultiInt": "Multi Int"}
+NODE_DISPLAY_NAME_MAPPINGS = {"MultiInt": "🩺 Multi Int"}

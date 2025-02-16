@@ -60,5 +60,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "MultiText": "Multi Text"  # Display name for the MultiText node
+    "MultiText": "🩺 Multi Text"  # Display name for the MultiText node
 }
