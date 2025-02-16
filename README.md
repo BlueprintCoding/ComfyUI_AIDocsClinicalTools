@@ -8,6 +8,7 @@ This package provides two advanced nodes for use in the Comfy Node system: the M
 ## Overview
 
 ### MultiInt Node
+![image](https://github.com/user-attachments/assets/1b6a6b57-1c18-417e-a149-cd156401f246)
 
 The **MultiInt** node allows you to manage multiple integer outputs within a single node. Each integer has its own:
 - **Label:** A custom string (e.g., "Frames", "Steps", etc.) that identifies the input.
@@ -19,6 +20,7 @@ The **MultiInt** node allows you to manage multiple integer outputs within a sin
 This node is ideal when you need to setup multiple numeric parameters (such as thresholds, counts, or configuration numbers) through a single node saving space.
 
 ### MultiText Node
+![image](https://github.com/user-attachments/assets/cb64eabe-69b1-4c27-aa03-6a88ccc4723d)
 
 The **MultiText** node is similar in concept to the MultiInt node but is designed to manage multiple text inputs. Each text field has its own customizable label and multiline support. Forked from "ComfyUI_SKBundle" where I had made a few PRs previously but decieded it was time to split to my own node set. It is particularly useful for:
 - Building prompts.
