@@ -10,7 +10,7 @@ This package provides two advanced nodes for use in the Comfy Node system: the M
 ### MultiInt Node
 
 The **MultiInt** node allows you to manage multiple integer outputs within a single node. Each integer has its own:
-- **Label:** A custom string (e.g., "INT 1", "i1", etc.) that identifies the input.
+- **Label:** A custom string (e.g., "Frames", "Steps", etc.) that identifies the input.
 - **Value:** The current integer value.
 - **Step:** A configurable increment/decrement step value. You can adjust the step individually for each integer.
 - **Control Buttons:** Plus and minus buttons allow users to increment or decrement the values. In addition, you can adjust values via dragging (by clicking and holding on the int value) or inline editing (by clicking on the pencil).
