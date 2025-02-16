@@ -1,2 +1,30 @@
 # ComfyUI_AIDocsClinicalTools
  The AI Doctors Custom ComfyUI Nodes
+
+This package provides two advanced nodes for use in the Comfy Node system: the MultiInt node and the MultiText node. They are designed to handle setup multiple of ints and text in a single node, respectively, with built‐in features for dynamic configuration, custom labeling, and per–input settings.
+
+---
+
+## Overview
+
+### MultiInt Node
+
+The **MultiInt** node allows you to manage multiple integer outputs within a single node. Each integer has its own:
+- **Label:** A custom string (e.g., "INT 1", "i1", etc.) that identifies the input.
+- **Value:** The current integer value.
+- **Step:** A configurable increment/decrement step value. You can adjust the step individually for each integer.
+- **Control Buttons:** Plus and minus buttons allow users to increment or decrement the values. In addition, you can adjust values via dragging (by clicking and holding on the int value) or inline editing (by clicking on the pencil).
+- **Settings:** Configure default parameters such as the background color, button colors, and step values.
+
+This node is ideal when you need to setup multiple numeric parameters (such as thresholds, counts, or configuration numbers) through a single node saving space.
+
+### MultiText Node
+
+The **MultiText** node is similar in concept to the MultiInt node but is designed to manage multiple text inputs. Each text field has its own customizable label and multiline support. Forked from "ComfyUI_SKBundle" where I had made a few PRs previously but decieded it was time to split to my own node set. It is particularly useful for:
+- Building prompts.
+- Handling multiple strings or notes within one node.
+- Single output of one input or concatting multiple prompts together with a specified seperator.
+- Keeping your node-based UI organized while handling dynamic text data.
+
+### Both nodes support:
+- Adding or removing individual inputs via +,- buttons.
