@@ -25,7 +25,7 @@ class MultiInt:
     RETURN_TYPES = ("INT",) * 20
     RETURN_NAMES = tuple(f"i{i+1}" for i in range(20))
     FUNCTION = "process"
-    CATEGORY = "AIDocsClinicalTools"
+    CATEGORY = "AIDoc"
     UI = "MultiIntNode"  # Must match the JS filename "MultiIntNode.js"
 
     def process(self, **kwargs):

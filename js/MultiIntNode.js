@@ -268,7 +268,82 @@ class MultiIntNode {
         };
     }
     
-    
+    startValueDragToggle(index, initialEvent) {
+        // If already dragging, then stop dragging (commit the value)
+        if (this.dragActive) {
+          this.stopValueDrag();
+          return;
+        }
+        
+        // Start drag mode for this value.
+        this.dragActive = true;
+        this.dragIndex = index;
+        this.dragInitialX = initialEvent.clientX;
+        this.dragInitialValue = this.node.properties.values[index];
+        const step = this.node.properties.intStep || 1;
+        const sensitivity = 10; // pixels per step change
+        
+        // Get the canvas element.
+        const canvasEl = document.getElementById("graph-canvas");
+        if (!canvasEl) return;
+        
+        // Define a pointermove handler to update the value as the pointer moves.
+        this._onValuePointerMove = (e) => {
+          const dx = e.clientX - this.dragInitialX;
+          const steps = Math.floor(dx / sensitivity);
+          const newValue = this.dragInitialValue + steps * step;
+          if (newValue !== this.node.properties.values[this.dragIndex]) {
+            this.node.properties.values[this.dragIndex] = newValue;
+            if (this.node.widgets[this.dragIndex]) {
+              this.node.widgets[this.dragIndex].value = newValue;
+            }
+            this.node.setDirtyCanvas(true, true);
+          }
+        };
+        
+        // Attach the pointermove handler to the canvas.
+        canvasEl.addEventListener("pointermove", this._onValuePointerMove);
+        
+        // Define a global click handler to stop the drag.
+        this._onGlobalClickToStop = (e) => {
+          // Prevent this click from re-triggering startValueDragToggle immediately.
+          console.log("Global click detected—stopping drag");
+          this.stopValueDrag();
+        };
+        // Attach the global click handler with capture so it fires before other click handlers.
+        document.addEventListener("click", this._onGlobalClickToStop, { capture: true });
+        
+        // Also attach a keydown handler on the document so that Enter or Esc stop drag mode.
+        this._onKeyDownToStop = (e) => {
+          if (e.key === "Enter" || e.key === "Escape") {
+            console.log("Keydown (" + e.key + ") detected—stopping drag");
+            this.stopValueDrag();
+          }
+        };
+        document.addEventListener("keydown", this._onKeyDownToStop);
+      }
+      
+      stopValueDrag() {
+        const canvasEl = document.getElementById("graph-canvas");
+        if (!canvasEl) return;
+        
+        if (this._onValuePointerMove) {
+          canvasEl.removeEventListener("pointermove", this._onValuePointerMove);
+          this._onValuePointerMove = null;
+        }
+        if (this._onGlobalClickToStop) {
+          document.removeEventListener("click", this._onGlobalClickToStop, { capture: true });
+          this._onGlobalClickToStop = null;
+        }
+        if (this._onKeyDownToStop) {
+          document.removeEventListener("keydown", this._onKeyDownToStop);
+          this._onKeyDownToStop = null;
+        }
+        this.dragActive = false;
+        this.dragIndex = null;
+        this.node.setDirtyCanvas(true, true);
+      }
+      
 
     onMouseDown(e, pos) {
         // Check pencil icons
@@ -322,6 +397,18 @@ class MultiIntNode {
             }
         }
 
+        // Check if the click is in a value rectangle and start drag-to-change behavior
+        // Then, check if the click is in a value rectangle:
+        for (let i = 0; i < this.valueRects.length; i++) {
+            const r = this.valueRects[i];
+            if (r && pos[0] >= r.x && pos[0] <= r.x + r.w &&
+                pos[1] >= r.y && pos[1] <= r.y + r.h) {
+              // Toggle drag mode on the value at index i.
+              this.startValueDragToggle(i, e);
+              return true;
+            }
+          }
+        
         // Check gear icon
         if (this.gearRect) {
             const r = this.gearRect;
