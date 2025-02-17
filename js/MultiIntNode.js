@@ -26,13 +26,39 @@ function getTextColorForBackground(bgColor) {
     return luminance < 0.5 ? '#ffffff' : '#000000';  // White for dark background, black for light
 }
 
+function truncateText(ctx, text, maxWidth) {
+    const ellipsis = "...";
+    const ellipsisWidth = ctx.measureText(ellipsis).width;
+    
+    if (ctx.measureText(text).width <= maxWidth) {
+      return text;  // No need to truncate
+    }
+  
+    // Start removing characters until it fits
+    let truncated = text;
+    while (truncated && 
+           ctx.measureText(truncated).width + ellipsisWidth > maxWidth) {
+      truncated = truncated.slice(0, -1); 
+    }
+    return truncated + ellipsis;
+  }
+  
+
 class MultiIntNode {
     constructor(node) {
         this.node = node;
 
         // Default properties
         if (typeof node.properties.activeCount !== "number") {
-            node.properties.activeCount = 5;
+            node.properties.activeCount = 20;
+        }
+            // Default manual height settings (if not set)
+        if (typeof node.properties.manualHeight !== "boolean") {
+            node.properties.manualHeight = false;
+        }
+        if (typeof node.properties.customHeight !== "number") {
+        // If not manually set, leave it undefined (or you can set a default)
+            node.properties.customHeight = undefined;
         }
         // We'll use an array for per–row step values.
         if (!Array.isArray(node.properties.intSteps)) {
@@ -95,70 +121,81 @@ class MultiIntNode {
     
     onDrawForeground(ctx) {
         if (this.node.flags.collapsed) return;
+
+          // Ensure outputs match activeCount
+  if (this.node.outputs.length !== this.node.properties.activeCount) {
+    this.node.outputs = [];
+    this.node.widgets = [];
+    // Rebuild outputs/widgets
+    this.setupOutputsAndWidgets();
+    if (this.node.onOutputsChange) {
+      this.node.onOutputsChange();
+    }
+  }
+
     
         const margin = 8;
         const rowHeight = 30;
         const rowSpacing = margin;
         const count = this.node.properties.activeCount;
     
-        // Compute node size
-        let totalHeight = margin + (count * (rowHeight + rowSpacing)); 
-        const MIN_WIDTH = 320;
-        if (this.node.size[0] < MIN_WIDTH) {
-            this.node.size[0] = MIN_WIDTH;
+        // Enforce minimum height so rows don’t overflow
+        const minHeight = margin + (count * (rowHeight + rowSpacing));
+        if (this.node.size[1] < minHeight) {
+            this.node.size[1] = minHeight;
         }
-        this.node.size[1] = totalHeight;
-    
-        // Use the color stored in bgColor, or fallback to the default color
-        const bgColor = this.node.properties.bgColor || "#181818";  // Default color
-        ctx.fillStyle = bgColor;
 
-        // Draw a background with rounded bottom corners
-        const radius = 8;  // Adjust the radius to control the roundness of the corners
+         // Enforce minimum width
+        if (this.node.size[0] < 250) {
+            this.node.size[0] = 250;
+        }
+
+                 // Enforce max width
+                 if (this.node.size[0] > 1000) {
+                    this.node.size[0] = 1000;
+                }
+            
+    
+    
+        // Draw node background
+        const bgColor = this.node.properties.bgColor || "#181818";
+        ctx.fillStyle = bgColor;
+        const radius = 8;
         ctx.beginPath();
-        // Top-left corner
-        ctx.moveTo(0, 0); 
-        ctx.lineTo(this.node.size[0], 0); // Top edge
-        ctx.lineTo(this.node.size[0], this.node.size[1] - radius); // Right edge (top to bottom, leaving space for bottom rounded corner)
-        ctx.arcTo(this.node.size[0], this.node.size[1], this.node.size[0] - radius, this.node.size[1], radius); // Bottom-right corner
-        ctx.lineTo(radius, this.node.size[1]);  // Bottom edge (right to left)
-        ctx.arcTo(0, this.node.size[1], 0, this.node.size[1] - radius, radius); // Bottom-left corner
-        ctx.lineTo(0, radius); // Left edge (bottom to top)
+        ctx.moveTo(0, 0);
+        ctx.lineTo(this.node.size[0], 0);
+        ctx.lineTo(this.node.size[0], this.node.size[1] - radius);
+        ctx.arcTo(this.node.size[0], this.node.size[1], this.node.size[0] - radius, this.node.size[1], radius);
+        ctx.lineTo(radius, this.node.size[1]);
+        ctx.arcTo(0, this.node.size[1], 0, this.node.size[1] - radius, radius);
+        ctx.lineTo(0, radius);
         ctx.closePath();
         ctx.fill();
-
-        // Row backgrounds
-        const rowBgWidth = this.node.size[0] - margin - 38; // Reserve space for outputs
+    
+        const rowBgWidth = this.node.size[0] - margin - 38; // space for outputs
+        const rowBgColor = this.node.properties.rowBgColor || "#121212";
+        const rowTextColor = getTextColorForBackground(rowBgColor) || "#fff";
+    
         this.labelRects = [];
         this.valueRects = [];
         this.pencilRects = [];
         this.incrementRects = [];
         this.decrementRects = [];
-
-        const rowBgColor = this.node.properties.rowBgColor || "#121212";
-        const rowTextColor = getTextColorForBackground(rowBgColor) || '#fff';
     
         let y = margin;
         for (let i = 0; i < count; i++) {
-            // Row background
-            // Set the radius for the rounded corners
-            const radius = 5;  // Adjust as needed
-            // Row background with rounded corners
+            // Draw row background
             ctx.fillStyle = rowBgColor;
             ctx.beginPath();
-            // Top-left corner
-            ctx.moveTo(margin + radius, y);  
-            ctx.arcTo(margin + rowBgWidth, y, margin + rowBgWidth, y + rowHeight, radius);  // Top-right corner
-            // Bottom-right corner
-            ctx.arcTo(margin + rowBgWidth, y + rowHeight, margin, y + rowHeight, radius);  // Bottom-right corner
-            // Bottom-left corner
-            ctx.arcTo(margin, y + rowHeight, margin, y, radius);  // Bottom-left corner
-            // Top-left corner (to close the path)
-            ctx.arcTo(margin, y, margin + rowBgWidth, y, radius);  // Top-left corner
-
+            ctx.moveTo(margin + radius, y);
+            ctx.arcTo(margin + rowBgWidth, y, margin + rowBgWidth, y + rowHeight, radius);
+            ctx.arcTo(margin + rowBgWidth, y + rowHeight, margin, y + rowHeight, radius);
+            ctx.arcTo(margin, y + rowHeight, margin, y, radius);
+            ctx.arcTo(margin, y, margin + rowBgWidth, y, radius);
             ctx.closePath();
             ctx.fill();
-            // Static label (left) - e.g., i1, i2, i3, etc.
+    
+            // 1) Static label: "·iN"
             ctx.fillStyle = rowTextColor;
             ctx.font = "12px Arial";
             ctx.textBaseline = "middle";
@@ -168,43 +205,85 @@ class MultiIntNode {
             const staticLabelX = margin + 2;
             const staticLabelY = y + rowHeight / 2;
             ctx.fillText(staticLabel, staticLabelX, staticLabelY);
-
-            // Draw the vertical line
-            const lineStartX = staticLabelX + staticLabelMetrics.width + 4;  // Right of static label
-            const lineStartY = staticLabelY - rowHeight / 2;  // Start from the middle of the static label
-            const lineEndY = lineStartY + rowHeight;  // End after the row height (making the line same length as row)
-
-            // Set the line color
-            ctx.strokeStyle = rowTextColor;  // Same color as label for consistency
-            ctx.lineWidth = 1;  // Line thickness
-
+    
+            // Vertical line after static label
+            const lineStartX = staticLabelX + staticLabelMetrics.width + 4;
+            ctx.strokeStyle = rowTextColor;
+            ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(lineStartX, lineStartY);  // Starting point of the line
-            ctx.lineTo(lineStartX, lineEndY);    // Vertical line to the bottom of the row
-            ctx.stroke();  // Actually draw the line
+            ctx.moveTo(lineStartX, staticLabelY - rowHeight / 2);
+            ctx.lineTo(lineStartX, staticLabelY + rowHeight / 2);
+            ctx.stroke();
+    
+            // 2) Numeric display position
+            const valX = margin + rowBgWidth - 90;
+            const valY = staticLabelY; // same vertical center
+            
+            // Calculate available space for the custom label:
+            const labelAreaStart = lineStartX + 6;  // small gap after line
+            const labelAreaEnd = valX - 80;         // leave some padding before the numeric value
+            let availableWidth = labelAreaEnd - labelAreaStart;
+            if (availableWidth < 0) {
+            availableWidth = 0;
+            }
+                        
+            // Define breakpoint rules for label width adjustments.
+            const labelWidthRules = [
+                { max: 10, set: 60 },
+                { max: 15, set: 65 },
+                { max: 30, set: 80 },
+                { max: 50, set: 90 },
+                { max: 70, set: 100 },
+                { max: 90, set: 110 },
+                { max: 150, multiplier: 1.2 },
+                { max: 200, multiplier: 1.15 },
+                { max: 400, multiplier: 0.98 },
+                { max: 500, multiplier: 0.95 },
+                { max: Infinity, multiplier: 0.93 }
+            ];
+            
+            function adjustLabelWidth(width) {
+                for (const rule of labelWidthRules) {
+                if (width <= rule.max) {
+                    if (rule.set !== undefined) {
+                    return rule.set;
+                    }
+                    if (rule.multiplier !== undefined) {
+                    return width * rule.multiplier;
+                    }
+                }
+                }
+                return width;
+            }
+            
+            // Raw label text from node properties
+            const customLabelRaw = this.node.properties.labels[i] || `INT ${i + 1}`;
+            // Adjust the available width using our rules:
+            const adjustedWidth = adjustLabelWidth(availableWidth);
 
-            // Custom label (right of static label) - e.g., INT 1, INT 2, etc.
+            // Then truncate the text to fit within adjustedWidth:
+            const displayLabel = truncateText(ctx, customLabelRaw, adjustedWidth);
+                
+            // Draw truncated label
             ctx.fillStyle = rowTextColor;
             ctx.font = "14px Arial";
-            const customLabel = this.node.properties.labels[i] || `INT ${i + 1}`;
-            const customLabelMetrics = ctx.measureText(customLabel);
-            const customLabelX = staticLabelX + staticLabelMetrics.width + 10; // space between iN and INT N
-            ctx.fillText(customLabel, customLabelX, staticLabelY);
+            ctx.fillText(displayLabel, labelAreaStart, staticLabelY);
+    
+            // Save label rect
+            const displayedLabelWidth = ctx.measureText(displayLabel).width;
             this.labelRects[i] = {
-                x: customLabelX,
+                x: labelAreaStart,
                 y,
-                w: customLabelMetrics.width + 8,
+                w: displayedLabelWidth + 8,
                 h: rowHeight
             };
-
-
-            // Value (middle)
+    
+            // 4) Numeric value
             const val = this.node.properties.values[i] ?? 0;
             const valStr = val.toString();
             ctx.textAlign = "right";
+            ctx.font = "14px Arial";
             const valMetrics = ctx.measureText(valStr);
-            const valX = margin + rowBgWidth - 90; // space for increment/decrement buttons and pencil
-            const valY = y + rowHeight / 2;
             ctx.fillText(valStr, valX, valY);
             this.valueRects[i] = {
                 x: valX - valMetrics.width - 4,
@@ -213,39 +292,33 @@ class MultiIntNode {
                 h: rowHeight
             };
     
-            // Pencil icon
+            // 5) Pencil icon
             ctx.textAlign = "left";
             ctx.fillStyle = rowTextColor;
             ctx.font = "16px Arial";
             const pencilIcon = "✎";
             const pencilMetrics = ctx.measureText(pencilIcon);
             const pencilX = valX + 6;
-            const pencilY = y + rowHeight / 2;
-            ctx.fillText(pencilIcon, pencilX, pencilY);
+            ctx.fillText(pencilIcon, pencilX, valY);
             this.pencilRects[i] = {
                 x: pencilX,
                 y,
                 w: pencilMetrics.width + 4,
                 h: rowHeight
             };
-
-            
-            const incDecColor = this.node.properties.buttonColor || "#4b3e72";  // Default color
-            const textColor = getTextColorForBackground(incDecColor);  // Get text color based on the background
-
-
-            // Create a fixed-size rounded box for the decrement (-) button
-            const decrementButtonBoxX = valX + 36;  // Space for the box (positioned to the right of the value)
+    
+            // 6) Increment/decrement buttons
+            const incDecColor = this.node.properties.buttonColor || "#4b3e72";
+            const incDecTextColor = getTextColorForBackground(incDecColor);
+            const decrementButtonBoxX = valX + 36;
             const decrementButtonBoxY = y + (rowHeight / 4) - 2;
-            const buttonBoxWidth = 20;     // Fixed width for the button box
-            const buttonBoxHeight = 20;    // Fixed height for the button box
-
-            // Create a fixed-size rounded box for the increment (+) button
-            const incrementButtonBoxX = decrementButtonBoxX + 24;  // Space for the box to the right of the + button
-            const incrementButtonBoxY = decrementButtonBoxY;  // Same Y position as the + button box
-
-            // Set the background color for the decrement button box
-            ctx.fillStyle = incDecColor;  // Purple background
+            const buttonBoxWidth = 20;
+            const buttonBoxHeight = 20;
+            const incrementButtonBoxX = decrementButtonBoxX + 24;
+            const incrementButtonBoxY = decrementButtonBoxY;
+    
+            // Decrement button
+            ctx.fillStyle = incDecColor;
             ctx.beginPath();
             ctx.moveTo(decrementButtonBoxX + 5, decrementButtonBoxY); // Top-left corner
             ctx.arcTo(decrementButtonBoxX + buttonBoxWidth, decrementButtonBoxY, decrementButtonBoxX + buttonBoxWidth, decrementButtonBoxY + buttonBoxHeight, 5); // Top-right corner
@@ -254,15 +327,18 @@ class MultiIntNode {
             ctx.arcTo(decrementButtonBoxX, decrementButtonBoxY, decrementButtonBoxX + buttonBoxWidth, decrementButtonBoxY, 5); // Top-left corner
             ctx.closePath();
             ctx.fill();
-
-            // Draw Decrement Button (-)
-            const decrementButton = "-";
-            ctx.font = "12px Arial";  // Smaller font size for the button text
-            ctx.fillStyle = textColor; // White color for the text inside the button
-            ctx.fillText(decrementButton, decrementButtonBoxX + 8, decrementButtonBoxY + buttonBoxHeight / 2); // Draw - button in the middle
-
-            // Set the background color for the increment button box
-            ctx.fillStyle = incDecColor;  // Purple background
+            ctx.font = "12px Arial";
+            ctx.fillStyle = incDecTextColor;
+            ctx.fillText("-", decrementButtonBoxX + 8, decrementButtonBoxY + buttonBoxHeight / 2);
+            this.decrementRects[i] = {
+                x: decrementButtonBoxX,
+                y: decrementButtonBoxY,
+                w: buttonBoxWidth,
+                h: buttonBoxHeight
+            };
+    
+            // Increment button
+            ctx.fillStyle = incDecColor;
             ctx.beginPath();
             ctx.moveTo(incrementButtonBoxX + 5, incrementButtonBoxY); // Top-left corner
             ctx.arcTo(incrementButtonBoxX + buttonBoxWidth, incrementButtonBoxY, incrementButtonBoxX + buttonBoxWidth, incrementButtonBoxY + buttonBoxHeight, 5); // Top-right corner
@@ -271,34 +347,20 @@ class MultiIntNode {
             ctx.arcTo(incrementButtonBoxX, incrementButtonBoxY, incrementButtonBoxX + buttonBoxWidth, incrementButtonBoxY, 5); // Top-left corner
             ctx.closePath();
             ctx.fill();
-
-            // Draw Increment Button (+)
-            const incrementButton = "+";
-            ctx.font = "12px Arial";  // Smaller font size for the button text
-            ctx.fillStyle = textColor; // White color for the text inside the button
-            ctx.fillText(incrementButton, incrementButtonBoxX + 6, incrementButtonBoxY + buttonBoxHeight / 2); // Draw + button in the middle
-
-
-
-            // Save button areas for interaction detection (with separate button box positions)
+            ctx.font = "12px Arial";
+            ctx.fillStyle = incDecTextColor;
+            ctx.fillText("+", incrementButtonBoxX + 6, incrementButtonBoxY + buttonBoxHeight / 2);
             this.incrementRects[i] = {
                 x: incrementButtonBoxX,
                 y: incrementButtonBoxY,
                 w: buttonBoxWidth,
                 h: buttonBoxHeight
             };
-
-            this.decrementRects[i] = {
-                x: decrementButtonBoxX,
-                y: decrementButtonBoxY,
-                w: buttonBoxWidth,
-                h: buttonBoxHeight
-            };
-
-            y += rowHeight + rowSpacing;
-            }
     
-        // Gear icon at bottom-right
+            y += rowHeight + rowSpacing;
+        }
+    
+        // 7) Gear icon at bottom-right
         const gearIcon = "⚙️";
         ctx.font = "18px Arial";
         ctx.textAlign = "center";
@@ -309,7 +371,6 @@ class MultiIntNode {
         const gearX = this.node.size[0] - margin - (gearWidth / 2);
         const gearY = this.node.size[1] - margin - (gearHeight / 2);
         ctx.fillText(gearIcon, gearX, gearY);
-    
         this.gearRect = {
             x: gearX - gearWidth / 2,
             y: gearY - gearHeight / 2,
@@ -317,6 +378,7 @@ class MultiIntNode {
             h: gearHeight
         };
     }
+    
     
     startValueDragToggle(index, initialEvent) {
         // If already dragging, then stop dragging (commit the value)
@@ -532,13 +594,18 @@ class MultiIntNode {
         }, 10);
     
         const commit = () => {
-            const val = input.value.trim();
+            let val = input.value.trim();
+            // Enforce a maximum length of 120 characters
+            if (val.length > 120) {
+              val = val.substring(0, 120);
+            }
             if (val.length > 0) {
-                this.node.properties.labels[index] = val;
-                this.node.setDirtyCanvas(true, true);
+              this.node.properties.labels[index] = val;
+              this.node.setDirtyCanvas(true, true);
             }
             remove();
-        };
+          };
+          
     
         const remove = () => {
             document.removeEventListener("click", outsideClick, true);
@@ -863,7 +930,7 @@ class MultiIntNode {
         const input = document.createElement("input");
         input.type = "text";
         input.value = this.node.properties.values[index].toString();
-
+      
         input.style.position = "fixed";
         const offsetX = -(rect.w * 0.5);
         const offsetY = -(rect.h * 0.5);
@@ -873,7 +940,7 @@ class MultiIntNode {
         input.style.top = (screenY + offsetY + FixedOffsetY) + "px";
         input.style.width = Math.max(rect.w, 60) + "px";
         input.style.height = Math.max(rect.h, 24) + "px";
-
+      
         input.style.fontSize = "14px";
         input.style.zIndex = "10000";
         input.style.background = "#181818";
@@ -882,53 +949,68 @@ class MultiIntNode {
         input.style.borderRadius = "6px";
         input.style.outline = "none";
         input.style.padding = "0 6px";
-
+      
         document.body.appendChild(input);
-
+      
         setTimeout(() => {
-            input.focus();
-            input.select();
+          input.focus();
+          input.select();
         }, 10);
-
+      
+        // Updated commit: evaluate the input as a math expression if possible.
         const commit = () => {
-            const val = parseInt(input.value, 10);
-            if (!isNaN(val)) {
-                this.node.properties.values[index] = val;
-                if (this.node.widgets[index]) {
-                    this.node.widgets[index].value = val;
-                }
-                this.node.setDirtyCanvas(true, true);
+          let inputVal = input.value.trim();
+          if (inputVal.length > 0) {
+            let result;
+            try {
+              // Allow only digits, spaces, decimal points, and math operators (+ - * / ( ) )
+              if (/^[0-9+\-*/().\s]+$/.test(inputVal)) {
+                result = eval(inputVal);
+              } else {
+                result = parseInt(inputVal, 10);
+              }
+            } catch (ex) {
+              result = parseInt(inputVal, 10);
             }
-            remove();
+            if (!isNaN(result)) {
+              this.node.properties.values[index] = result;
+              if (this.node.widgets[index]) {
+                this.node.widgets[index].value = result;
+              }
+              this.node.setDirtyCanvas(true, true);
+            }
+          }
+          remove();
         };
-
+      
         const remove = () => {
-            document.removeEventListener("click", outsideClick, true);
-            if (input.parentNode) {
-                input.parentNode.removeChild(input);
-            }
+          document.removeEventListener("click", outsideClick, true);
+          if (input.parentNode) {
+            input.parentNode.removeChild(input);
+          }
         };
-
+      
         const outsideClick = (evt) => {
-            if (evt.target !== input) {
-                commit();
-            }
+          if (evt.target !== input) {
+            commit();
+          }
         };
-
+      
         setTimeout(() => {
-            document.addEventListener("click", outsideClick, true);
+          document.addEventListener("click", outsideClick, true);
         }, 100);
-
+      
         input.addEventListener("keydown", (evt) => {
-            if (evt.key === "Enter") {
-                evt.preventDefault();
-                commit();
-            } else if (evt.key === "Escape") {
-                evt.preventDefault();
-                remove();
-            }
+          if (evt.key === "Enter") {
+            evt.preventDefault();
+            commit();
+          } else if (evt.key === "Escape") {
+            evt.preventDefault();
+            remove();
+          }
         });
-    }
+      }
+      
 
     onValueChanged(index, val) {
         this.node.properties.values[index] = parseInt(val, 10) || 0;
