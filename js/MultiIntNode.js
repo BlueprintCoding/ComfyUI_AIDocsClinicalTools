@@ -783,35 +783,42 @@ class MultiIntNode {
     minusBtn.addEventListener("click", (evt) => {
         evt.stopPropagation();
         const currentWidth = this.node.size[0];
-
+    
         if (this.node.properties.activeCount > 1) {
             this.node.properties.activeCount = Math.max(1, this.node.properties.activeCount - 1);
-            this.adjustArrays();  // Update intSteps and other arrays
+            this.adjustArrays();
             updateStepInputs();  // Update the step inputs in the UI
+            this.setupOutputsAndWidgets();
+            // If your version of Litegraph supports it, call onOutputsChange:
+            if (this.node.onOutputsChange) {
+                this.node.onOutputsChange();
+            }
             this.node.setDirtyCanvas(true, true);
-
             this.node.size[0] = currentWidth;
             this.node.setDirtyCanvas(true, true);
             setTimeout(() => popup.reposition(this.node.htmlElement, 10, 10), 50);
         }
     });
-
-    // plus logic
+    
     plusBtn.addEventListener("click", (evt) => {
         evt.stopPropagation();
         const currentWidth = this.node.size[0];
-
+    
         if (this.node.properties.activeCount < 20) {
             this.node.properties.activeCount = Math.min(20, this.node.properties.activeCount + 1);
-            this.adjustArrays();  // Update intSteps and other arrays
+            this.adjustArrays();
             updateStepInputs();  // Update the step inputs in the UI
+            this.setupOutputsAndWidgets();
+            if (this.node.onOutputsChange) {
+                this.node.onOutputsChange();
+            }
             this.node.setDirtyCanvas(true, true);
-
             this.node.size[0] = currentWidth;
             this.node.setDirtyCanvas(true, true);
             setTimeout(() => popup.reposition(this.node.htmlElement, 10, 10), 50);
         }
     });
+    
 }
 
     
@@ -942,28 +949,29 @@ class MultiIntNode {
         }
         this.node.setDirtyCanvas(true, true);
       }
+
     // Ensure that labels, values, and intSteps arrays have exactly activeCount elements.
-    adjustArrays() {
-        const count = this.node.properties.activeCount;
-    
-        // Adjust labels
-        while (this.node.properties.labels.length < count) {
-            this.node.properties.labels.push(`i${this.node.properties.labels.length + 1}`);
-        }
-        this.node.properties.labels.length = count;
-    
-        // Adjust values
-        while (this.node.properties.values.length < count) {
-            this.node.properties.values.push(0);
-        }
-        this.node.properties.values.length = count;
-    
-        // Adjust intSteps
-        while (this.node.properties.intSteps.length < count) {
-            this.node.properties.intSteps.push(1);  // Default step value
-        }
-        this.node.properties.intSteps.length = count;
+adjustArrays() {
+    const count = this.node.properties.activeCount;
+    // Adjust labels array
+    while (this.node.properties.labels.length < count) {
+        this.node.properties.labels.push(`i${this.node.properties.labels.length + 1}`);
     }
+    this.node.properties.labels.length = count;
+    
+    // Adjust values array
+    while (this.node.properties.values.length < count) {
+        this.node.properties.values.push(0);
+    }
+    this.node.properties.values.length = count;
+    
+    // Adjust intSteps array (per–row step values)
+    while (this.node.properties.intSteps.length < count) {
+        this.node.properties.intSteps.push(1);  // Default step value is 1
+    }
+    this.node.properties.intSteps.length = count;
+}
+
     
 
 }
