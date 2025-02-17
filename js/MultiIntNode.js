@@ -228,15 +228,38 @@ class MultiIntNode {
                 w: pencilMetrics.width + 4,
                 h: rowHeight
             };
-    
-            // Create a fixed-size rounded box for the increment (+) button
-            const incrementButtonBoxX = valX + 36;  // Space for the box (positioned to the right of the value)
-            const incrementButtonBoxY = y + (rowHeight / 4) - 2;
+
+            
+            const incDecColor = this.node.properties.buttonColor || "#4b3e72";  // Default color
+            const textColor = getTextColorForBackground(incDecColor);  // Get text color based on the background
+
+
+            // Create a fixed-size rounded box for the decrement (-) button
+            const decrementButtonBoxX = valX + 36;  // Space for the box (positioned to the right of the value)
+            const decrementButtonBoxY = y + (rowHeight / 4) - 2;
             const buttonBoxWidth = 20;     // Fixed width for the button box
             const buttonBoxHeight = 20;    // Fixed height for the button box
 
-            const incDecColor = this.node.properties.buttonColor || "#4b3e72";  // Default color
-            const textColor = getTextColorForBackground(incDecColor);  // Get text color based on the background
+            // Create a fixed-size rounded box for the increment (+) button
+            const incrementButtonBoxX = decrementButtonBoxX + 24;  // Space for the box to the right of the + button
+            const incrementButtonBoxY = decrementButtonBoxY;  // Same Y position as the + button box
+
+            // Set the background color for the decrement button box
+            ctx.fillStyle = incDecColor;  // Purple background
+            ctx.beginPath();
+            ctx.moveTo(decrementButtonBoxX + 5, decrementButtonBoxY); // Top-left corner
+            ctx.arcTo(decrementButtonBoxX + buttonBoxWidth, decrementButtonBoxY, decrementButtonBoxX + buttonBoxWidth, decrementButtonBoxY + buttonBoxHeight, 5); // Top-right corner
+            ctx.arcTo(decrementButtonBoxX + buttonBoxWidth, decrementButtonBoxY + buttonBoxHeight, decrementButtonBoxX, decrementButtonBoxY + buttonBoxHeight, 5); // Bottom-right corner
+            ctx.arcTo(decrementButtonBoxX, decrementButtonBoxY + buttonBoxHeight, decrementButtonBoxX, decrementButtonBoxY, 5); // Bottom-left corner
+            ctx.arcTo(decrementButtonBoxX, decrementButtonBoxY, decrementButtonBoxX + buttonBoxWidth, decrementButtonBoxY, 5); // Top-left corner
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw Decrement Button (-)
+            const decrementButton = "-";
+            ctx.font = "12px Arial";  // Smaller font size for the button text
+            ctx.fillStyle = textColor; // White color for the text inside the button
+            ctx.fillText(decrementButton, decrementButtonBoxX + 8, decrementButtonBoxY + buttonBoxHeight / 2); // Draw - button in the middle
 
             // Set the background color for the increment button box
             ctx.fillStyle = incDecColor;  // Purple background
@@ -255,26 +278,7 @@ class MultiIntNode {
             ctx.fillStyle = textColor; // White color for the text inside the button
             ctx.fillText(incrementButton, incrementButtonBoxX + 6, incrementButtonBoxY + buttonBoxHeight / 2); // Draw + button in the middle
 
-            // Create a fixed-size rounded box for the decrement (-) button
-            const decrementButtonBoxX = incrementButtonBoxX + 24;  // Space for the box to the right of the + button
-            const decrementButtonBoxY = incrementButtonBoxY;  // Same Y position as the + button box
 
-            // Set the background color for the decrement button box
-            ctx.fillStyle = incDecColor;  // Purple background
-            ctx.beginPath();
-            ctx.moveTo(decrementButtonBoxX + 5, decrementButtonBoxY); // Top-left corner
-            ctx.arcTo(decrementButtonBoxX + buttonBoxWidth, decrementButtonBoxY, decrementButtonBoxX + buttonBoxWidth, decrementButtonBoxY + buttonBoxHeight, 5); // Top-right corner
-            ctx.arcTo(decrementButtonBoxX + buttonBoxWidth, decrementButtonBoxY + buttonBoxHeight, decrementButtonBoxX, decrementButtonBoxY + buttonBoxHeight, 5); // Bottom-right corner
-            ctx.arcTo(decrementButtonBoxX, decrementButtonBoxY + buttonBoxHeight, decrementButtonBoxX, decrementButtonBoxY, 5); // Bottom-left corner
-            ctx.arcTo(decrementButtonBoxX, decrementButtonBoxY, decrementButtonBoxX + buttonBoxWidth, decrementButtonBoxY, 5); // Top-left corner
-            ctx.closePath();
-            ctx.fill();
-
-            // Draw Decrement Button (-)
-            const decrementButton = "-";
-            ctx.font = "12px Arial";  // Smaller font size for the button text
-            ctx.fillStyle = textColor; // White color for the text inside the button
-            ctx.fillText(decrementButton, decrementButtonBoxX + 8, decrementButtonBoxY + buttonBoxHeight / 2); // Draw - button in the middle
 
             // Save button areas for interaction detection (with separate button box positions)
             this.incrementRects[i] = {
