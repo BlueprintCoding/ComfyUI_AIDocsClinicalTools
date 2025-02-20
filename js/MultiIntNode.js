@@ -52,14 +52,6 @@ class MultiIntNode {
         if (typeof node.properties.activeCount !== "number") {
             node.properties.activeCount = 20;
         }
-            // Default manual height settings (if not set)
-        if (typeof node.properties.manualHeight !== "boolean") {
-            node.properties.manualHeight = false;
-        }
-        if (typeof node.properties.customHeight !== "number") {
-        // If not manually set, leave it undefined (or you can set a default)
-            node.properties.customHeight = undefined;
-        }
         // We'll use an array for per–row step values.
         if (!Array.isArray(node.properties.intSteps)) {
             node.properties.intSteps = [];
@@ -71,11 +63,15 @@ class MultiIntNode {
             node.properties.values = [];
         }
         this.adjustArrays();
-
-        // Default node size
-        if (!node.size) {
-            node.size = [280, 200];
-        }
+        if (typeof node.properties.bottomPadding !== "number") {
+            node.properties.bottomPadding = 0;
+          }
+          if (typeof node.properties.minWidth !== "number") {
+            node.properties.minWidth = 250;
+          }
+          if (typeof node.properties.maxWidth !== "number") {
+            node.properties.maxWidth = 1000;
+          }
 
         // Rect arrays for label, value, pencil, gear, increment, and decrement buttons
         this.labelRects = [];
@@ -94,68 +90,65 @@ class MultiIntNode {
 
     
     setupOutputsAndWidgets() {
+        const oldSize = [...this.node.size];
         this.node.outputs = [];
         this.node.widgets = [];
-    
+      
         for (let i = 0; i < this.node.properties.activeCount; i++) {
-            // Create an INT output for each active slot
-            this.node.addOutput("", "INT");
-    
-            // Create a hidden widget for each value
-            const w = this.node.addWidget(
-                "number",
-                `value${i+1}`,
-                this.node.properties.values[i],
-                (val) => this.onValueChanged(i, val),
-                { hidden: true }
-            );
-            w.computeSize = () => [0, -4];
-            w.hidden = true;
+          this.node.addOutput("", "INT");
+          const w = this.node.addWidget(
+            "number",
+            `value${i+1}`,
+            this.node.properties.values[i],
+            (val) => this.onValueChanged(i, val),
+            { hidden: true }
+          );
+          w.computeSize = () => [0, -4];
+          w.hidden = true;
         }
-    
-        // Rename outputs to i1..iN
+      
         for (let i = 0; i < this.node.outputs.length; i++) {
-            this.node.outputs[i].name = `i${i+1}`;
+          this.node.outputs[i].name = `i${i+1}`;
         }
-    }
+      
+        this.node.size[0] = oldSize[0];
+      }
+      
     
     onDrawForeground(ctx) {
         if (this.node.flags.collapsed) return;
 
-          // Ensure outputs match activeCount
+
+  // Ensure outputs match activeCount
   if (this.node.outputs.length !== this.node.properties.activeCount) {
     this.node.outputs = [];
     this.node.widgets = [];
-    // Rebuild outputs/widgets
     this.setupOutputsAndWidgets();
     if (this.node.onOutputsChange) {
       this.node.onOutputsChange();
     }
   }
 
-    
-        const margin = 8;
-        const rowHeight = 30;
-        const rowSpacing = margin;
-        const count = this.node.properties.activeCount;
-    
-        // Enforce minimum height so rows don’t overflow
-        const minHeight = margin + (count * (rowHeight + rowSpacing));
-        if (this.node.size[1] < minHeight) {
-            this.node.size[1] = minHeight;
-        }
+  const margin = 8;
+  const rowHeight = 30;
+  const rowSpacing = margin;
+  const count = this.node.properties.activeCount;
 
-         // Enforce minimum width
-        if (this.node.size[0] < 250) {
-            this.node.size[0] = 250;
-        }
+  // Only enforce a minimum height if it's smaller than needed
+  const neededHeight = margin + count * (rowHeight + rowSpacing) + (this.node.properties.bottomPadding || 0);
+  if (this.node.size[1] < neededHeight) {
+    this.node.size[1] = neededHeight;
+  } else if (this.node.size[1] > neededHeight) {
+    this.node.size[1] = neededHeight;
+  }
 
-                 // Enforce max width
-                 if (this.node.size[0] > 1000) {
-                    this.node.size[0] = 1000;
-                }
-            
-    
+  // Enforce min/max width
+    if (this.node.size[0] < this.node.properties.minWidth) {
+        this.node.size[0] = this.node.properties.minWidth;
+    }
+    if (this.node.size[0] > this.node.properties.maxWidth) {
+        this.node.size[0] = this.node.properties.maxWidth;
+    }
     
         // Draw node background
         const bgColor = this.node.properties.bgColor || "#181818";
@@ -377,6 +370,14 @@ class MultiIntNode {
             w: gearWidth,
             h: gearHeight
         };
+        // Now add bottom padding
+const bottomPad = parseInt(this.node.properties.bottomPadding, 10) || 0;
+if (bottomPad > 0) {
+  // Draw a rectangle with rowBgColor if you want it visible
+  ctx.fillStyle = "#181818";
+  ctx.fillRect(margin + radius, y, rowBgWidth, bottomPad);
+  y += bottomPad;
+}
     }
     
     
@@ -418,6 +419,7 @@ class MultiIntNode {
         
         // Define a global click handler to stop the drag.
         this._onGlobalClickToStop = (e) => {
+            const oldSize = [...this.node.size];
           // Prevent this click from re-triggering startValueDragToggle immediately.
           console.log("Global click detected—stopping drag");
           this.stopValueDrag();
@@ -459,6 +461,7 @@ class MultiIntNode {
 
     onMouseDown(e, pos) {
         // Check pencil icons
+        const oldSize = [...this.node.size];
         for (let i = 0; i < this.pencilRects.length; i++) {
             const r = this.pencilRects[i];
             if (!r) continue;
@@ -850,6 +853,34 @@ class MultiIntNode {
         this.node.setDirtyCanvas(true, true);  
     });
 
+    
+    // ----------------------------Bottom padding for extra height ----------------------------
+    const bottomPaddingLabel = document.createElement("div");
+    bottomPaddingLabel.textContent = "Bottom Padding (px)";
+    bottomPaddingLabel.style.color = "#fff";
+    bottomPaddingLabel.style.fontSize = "12px";
+    bottomPaddingLabel.style.textAlign = "center";
+    content.appendChild(bottomPaddingLabel);
+    
+    const bottomPaddingInput = document.createElement("input");
+    bottomPaddingInput.type = "number";
+    bottomPaddingInput.value = this.node.properties.bottomPadding || 0;
+    bottomPaddingInput.style.width = "60px";
+    bottomPaddingInput.style.fontSize = "12px";
+    bottomPaddingInput.style.background = "#181818";
+    bottomPaddingInput.style.color = "#fff";
+    bottomPaddingInput.style.textAlign = "center";
+    content.appendChild(bottomPaddingInput);
+    
+    bottomPaddingInput.addEventListener("change", () => {
+      const newVal = parseInt(bottomPaddingInput.value, 10);
+      if (!isNaN(newVal)) {
+        this.node.properties.bottomPadding = newVal;
+        this.setupOutputsAndWidgets();
+        this.node.setDirtyCanvas(true, true);
+      }
+    });
+
     // minus logic
     minusBtn.addEventListener("click", (evt) => {
         evt.stopPropagation();
@@ -892,7 +923,6 @@ class MultiIntNode {
     
 }
 
-    
     createGearPopupFallback(x, y) {
         const popup = new SettingsPopup(this.node);
         popup.open(x, y);
@@ -1072,7 +1102,7 @@ app.registerExtension({
                 },
                 onMouseDown(e, pos) {
                     return this.multiIntNode.onMouseDown(e, pos);
-                }
+                },
             });
         }
     }
