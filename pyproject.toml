@@ -1,7 +1,7 @@
 [project]
 name = "The-AI-Doctors-Clinical-Tools"
 description = "Nodes: Multi Int and Multi Text; allows for the creation of multiple int and multiple string storage and output from a single node. Multi Float coming soon."
-version = "1.0.2"
+version = "1.0.3"
 license = {file = "LICENSE"}
 dependencies = []
 

@@ -52,6 +52,22 @@ class MultiIntNode {
             node.properties.intMax = [];
         }
         this.adjustArrays();
+
+        for (let i = 0; i < this.node.properties.activeCount; i++) {
+            const stepVal = this.node.properties.intSteps[i] || 1;
+
+            if (typeof this.node.properties.intMin[i] === "number") {
+                const oldMin = this.node.properties.intMin[i];
+                const newMin = stepVal * Math.round(oldMin / stepVal);
+                this.node.properties.intMin[i] = newMin;
+            }
+            if (typeof this.node.properties.intMax[i] === "number") {
+                const oldMax = this.node.properties.intMax[i];
+                const newMax = stepVal * Math.round(oldMax / stepVal);
+                this.node.properties.intMax[i] = newMax;
+            }
+        }
+    
         if (typeof node.properties.bottomPadding !== "number") {
             node.properties.bottomPadding = 0;
         }
@@ -70,6 +86,7 @@ class MultiIntNode {
         this.gearRect = null;
 
         this.setupOutputsAndWidgets();
+        node.setDirtyCanvas(true, true);
         node.onDrawForeground = this.onDrawForeground.bind(this);
     }
 
@@ -547,6 +564,20 @@ class MultiIntNode {
 
     openGearPopup(e) {
         e.stopPropagation();
+        // Before actually showing the popup, force min/max to resnap to step.
+        for (let i = 0; i < this.node.properties.activeCount; i++) {
+            const stepVal = this.node.properties.intSteps[i] || 1;
+            if (typeof this.node.properties.intMin[i] === "number") {
+                const oldMin = this.node.properties.intMin[i];
+                const snappedMin = stepVal * Math.round(oldMin / stepVal);
+                this.node.properties.intMin[i] = snappedMin;
+            }
+            if (typeof this.node.properties.intMax[i] === "number") {
+                const oldMax = this.node.properties.intMax[i];
+                const snappedMax = stepVal * Math.round(oldMax / stepVal);
+                this.node.properties.intMax[i] = snappedMax;
+            }
+        }
         let nodeElem = this.node.htmlElement;
         if (!nodeElem) {
             this.createGearPopupFallback(e.clientX, e.clientY);
@@ -630,7 +661,9 @@ class MultiIntNode {
 
         const updateStepInputs = () => {
             stepsList.innerHTML = '';
+        
             for (let i = 0; i < this.node.properties.activeCount; i++) {
+                // A row for iN
                 const rowDiv = document.createElement("div");
                 rowDiv.style.display = "flex";
                 rowDiv.style.justifyContent = "center";
@@ -638,14 +671,15 @@ class MultiIntNode {
                 rowDiv.style.marginBottom = "5px";
                 rowDiv.style.paddingBottom = "2px";
                 rowDiv.style.borderBottom = "2px solid #262626";
-
+        
                 const intLabel = document.createElement("span");
                 intLabel.textContent = `i${i + 1}`;
                 intLabel.style.color = "#fff";
                 intLabel.style.fontSize = "14px";
                 intLabel.style.marginRight = "5px";
                 rowDiv.appendChild(intLabel);
-
+        
+                // STEP input
                 const stepInput = document.createElement("input");
                 stepInput.type = "number";
                 stepInput.value = this.node.properties.intSteps[i] || 1;
@@ -658,23 +692,11 @@ class MultiIntNode {
                 stepInput.style.borderRadius = "6px";
                 stepInput.style.textAlign = "center";
                 stepInput.style.marginRight = "5px";
-                stepInput.addEventListener("change", () => {
-                    const newStep = parseInt(stepInput.value, 10);
-                    if (!isNaN(newStep) && newStep >= 1) {
-                        this.node.properties.intSteps[i] = newStep;
-                    } else {
-                        stepInput.value = this.node.properties.intSteps[i] || 1;
-                    }
-                });
                 rowDiv.appendChild(stepInput);
-
+        
+                // MIN input
                 const minInput = document.createElement("input");
                 minInput.type = "number";
-                if (typeof this.node.properties.intMin[i] === "number") {
-                    minInput.value = this.node.properties.intMin[i];
-                } else {
-                    minInput.value = "";
-                }
                 minInput.placeholder = "Min";
                 minInput.style.width = "50px";
                 minInput.style.fontSize = "12px";
@@ -684,24 +706,16 @@ class MultiIntNode {
                 minInput.style.borderRadius = "6px";
                 minInput.style.textAlign = "center";
                 minInput.style.marginRight = "5px";
-                minInput.addEventListener("change", () => {
-                    const val = parseInt(minInput.value, 10);
-                    if (!isNaN(val)) {
-                        this.node.properties.intMin[i] = val;
-                    } else {
-                        this.node.properties.intMin[i] = undefined;
-                        minInput.value = "";
-                    }
-                });
+                if (typeof this.node.properties.intMin[i] === "number") {
+                    minInput.value = this.node.properties.intMin[i];
+                } else {
+                    minInput.value = "";
+                }
                 rowDiv.appendChild(minInput);
-
+        
+                // MAX input
                 const maxInput = document.createElement("input");
                 maxInput.type = "number";
-                if (typeof this.node.properties.intMax[i] === "number") {
-                    maxInput.value = this.node.properties.intMax[i];
-                } else {
-                    maxInput.value = "";
-                }
                 maxInput.placeholder = "Max";
                 maxInput.style.width = "50px";
                 maxInput.style.fontSize = "12px";
@@ -710,20 +724,101 @@ class MultiIntNode {
                 maxInput.style.border = "2px solid #4b3e72";
                 maxInput.style.borderRadius = "6px";
                 maxInput.style.textAlign = "center";
+                if (typeof this.node.properties.intMax[i] === "number") {
+                    maxInput.value = this.node.properties.intMax[i];
+                } else {
+                    maxInput.value = "";
+                }
+                rowDiv.appendChild(maxInput);
+        
+                // Attach the rowDiv to stepsList
+                stepsList.appendChild(rowDiv);
+        
+                // 1) STEP CHANGE EVENT:
+                stepInput.addEventListener("change", () => {
+                    const newStep = parseInt(stepInput.value, 10);
+                    if (isNaN(newStep) || newStep < 1) {
+                        // Revert if invalid
+                        stepInput.value = this.node.properties.intSteps[i] || 1;
+                        return;
+                    }
+                    // Update step
+                    this.node.properties.intSteps[i] = newStep;
+                    
+                    // Now auto-resnap existing Min to the new step
+                    if (typeof this.node.properties.intMin[i] === "number") {
+                        const oldMin = this.node.properties.intMin[i];
+                        const steppedMin = newStep * Math.round(oldMin / newStep);
+                        if (steppedMin !== oldMin) {
+                            this.showEphemeralPopup(
+                                `Min not aligned with step. Using stepped value: ${steppedMin}`,
+                                stepInput.getBoundingClientRect().left,
+                                stepInput.getBoundingClientRect().top - 25
+                            );
+                        }
+                        this.node.properties.intMin[i] = steppedMin;
+                        minInput.value = steppedMin.toString();
+                    }
+        
+                    // Auto-resnap existing Max to the new step
+                    if (typeof this.node.properties.intMax[i] === "number") {
+                        const oldMax = this.node.properties.intMax[i];
+                        const steppedMax = newStep * Math.round(oldMax / newStep);
+                        if (steppedMax !== oldMax) {
+                            this.showEphemeralPopup(
+                                `Max not aligned with step. Using stepped value: ${steppedMax}`,
+                                stepInput.getBoundingClientRect().left,
+                                stepInput.getBoundingClientRect().top - 25
+                            );
+                        }
+                        this.node.properties.intMax[i] = steppedMax;
+                        maxInput.value = steppedMax.toString();
+                    }
+                });
+        
+                // 2) MIN CHANGE EVENT:
+                minInput.addEventListener("change", () => {
+                    const val = parseInt(minInput.value, 10);
+                    if (!isNaN(val)) {
+                        const stepVal = this.node.properties.intSteps[i] || 1;
+                        const steppedVal = stepVal * Math.round(val / stepVal);
+                        if (steppedVal !== val) {
+                            this.showEphemeralPopup(
+                                `Min not aligned with step. Using stepped value: ${steppedVal}`,
+                                minInput.getBoundingClientRect().left,
+                                minInput.getBoundingClientRect().top - 25
+                            );
+                        }
+                        this.node.properties.intMin[i] = steppedVal;
+                        minInput.value = steppedVal.toString();
+                    } else {
+                        this.node.properties.intMin[i] = undefined;
+                        minInput.value = "";
+                    }
+                });
+        
+                // 3) MAX CHANGE EVENT:
                 maxInput.addEventListener("change", () => {
                     const val = parseInt(maxInput.value, 10);
                     if (!isNaN(val)) {
-                        this.node.properties.intMax[i] = val;
+                        const stepVal = this.node.properties.intSteps[i] || 1;
+                        const steppedVal = stepVal * Math.round(val / stepVal);
+                        if (steppedVal !== val) {
+                            this.showEphemeralPopup(
+                                `Max not aligned with step. Using stepped value: ${steppedVal}`,
+                                maxInput.getBoundingClientRect().left,
+                                maxInput.getBoundingClientRect().top - 25
+                            );
+                        }
+                        this.node.properties.intMax[i] = steppedVal;
+                        maxInput.value = steppedVal.toString();
                     } else {
                         this.node.properties.intMax[i] = undefined;
                         maxInput.value = "";
                     }
                 });
-                rowDiv.appendChild(maxInput);
-
-                stepsList.appendChild(rowDiv);
             }
-        };
+        };               
         updateStepInputs();
 
         const bgColorLabel = document.createElement("div");
@@ -876,147 +971,139 @@ class MultiIntNode {
         const screenY = canvasRect.top + canvasY;
         this.spawnInlineEditorAtScreenPos(index, screenX, screenY, rect);
     }
-
     spawnInlineEditorAtScreenPos(index, screenX, screenY, rect) {
-      const input = document.createElement("input");
-      input.type = "text";
-      input.value = this.node.properties.values[index].toString();
-      input.style.position = "fixed";
-      const offsetX = -(rect.w * 0.5);
-      const offsetY = -(rect.h * 0.5);
-      const FixedOffsetX = 25;
-      const FixedOffsetY = 10;
-      input.style.left = (screenX + offsetX + FixedOffsetX) + "px";
-      input.style.top = (screenY + offsetY + FixedOffsetY) + "px";
-      input.style.width = Math.max(rect.w, 60) + "px";
-      input.style.height = Math.max(rect.h, 24) + "px";
-      input.style.fontSize = "14px";
-      input.style.zIndex = "10000";
-      input.style.background = "#181818";
-      input.style.color = "#fff";
-      input.style.border = "2px solid #4b3e72";
-      input.style.borderRadius = "6px";
-      input.style.outline = "none";
-      input.style.padding = "0 6px";
-      document.body.appendChild(input);
-  
-      setTimeout(() => {
-        input.focus();
-        input.select();
-      }, 10);
-  
-      const commit = () => {
-        let inputVal = input.value.trim();
-        if (inputVal.length > 0) {
-          let result;
-          try {
-            if (/^[0-9+\-*/().\s]+$/.test(inputVal)) {
-              result = eval(inputVal);
-            } else {
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = this.node.properties.values[index].toString();
+        input.style.position = "fixed";
+        const offsetX = -(rect.w * 0.5);
+        const offsetY = -(rect.h * 0.5);
+        const FixedOffsetX = 25;
+        const FixedOffsetY = 10;
+        input.style.left = (screenX + offsetX + FixedOffsetX) + "px";
+        input.style.top = (screenY + offsetY + FixedOffsetY) + "px";
+        input.style.width = Math.max(rect.w, 60) + "px";
+        input.style.height = Math.max(rect.h, 24) + "px";
+        input.style.fontSize = "14px";
+        input.style.zIndex = "10000";
+        input.style.background = "#181818";
+        input.style.color = "#fff";
+        input.style.border = "2px solid #4b3e72";
+        input.style.borderRadius = "6px";
+        input.style.outline = "none";
+        input.style.padding = "0 6px";
+        document.body.appendChild(input);
+    
+        setTimeout(() => {
+          input.focus();
+          input.select();
+        }, 10);
+    
+        const commit = () => {
+          let inputVal = input.value.trim();
+          if (inputVal.length > 0) {
+            let result;
+            try {
+              if (/^[0-9+\-*/().\s]+$/.test(inputVal)) {
+                result = eval(inputVal);
+              } else {
+                result = parseInt(inputVal, 10);
+              }
+            } catch {
               result = parseInt(inputVal, 10);
             }
-          } catch {
-            result = parseInt(inputVal, 10);
-          }
-          if (!isNaN(result)) {
-            const oldVal = result;
-            result = this.clampValue(index, result);
-            this.node.properties.values[index] = result;
-  
-            // If clampValue changed the result, show ephemeral popup above input
-            if (oldVal !== result) {
-              const rect = input.getBoundingClientRect();
-              const popupX = rect.left;
-              const popupY = rect.top - 35; // a bit above the input
-              const reason = (result === this.node.properties.intMin[index]) 
-                             ? `Min (${this.node.properties.intMin[index]})`
-                             : `Max (${this.node.properties.intMax[index]})`;
-              this.showEphemeralPopup(`Set value out of range. Using ${reason}`, popupX, popupY);
+    
+            if (!isNaN(result)) {
+              const messages = [];
+              const popupRect = input.getBoundingClientRect();
+              const popupX = popupRect.left;
+              const popupY = popupRect.top - 35;  
+    
+              const oldVal = result;
+              const step = this.node.properties.intSteps[index] || 1;
+              const steppedVal = step * Math.round(result / step);
+    
+              // If step rounding changed the value
+              if (steppedVal !== oldVal) {
+                messages.push(`Set value not within step.`);
+              }
+    
+              // Then clamp to min/max
+              const finalVal = this.clampValue(index, steppedVal);
+    
+              // If clamp changed it again
+              if (finalVal !== steppedVal) {
+                const reason = finalVal === this.node.properties.intMin[index]
+                  ? `Min (${finalVal})`
+                  : `Max (${finalVal})`;
+                messages.push(`Set value out of range.`);
+              }
+    
+              // Now, if there were any adjustments, append a note of the final
+              if (messages.length > 0) {
+                messages.push(`Set value: ${finalVal}`);
+                this.showEphemeralPopup(messages.join(" | "), popupX, popupY);
+              }
+    
+              this.node.properties.values[index] = finalVal;
+              if (this.node.widgets[index]) {
+                this.node.widgets[index].value = finalVal;
+              }
+              this.node.setDirtyCanvas(true, true);
             }
-  
-            if (this.node.widgets[index]) {
-              this.node.widgets[index].value = result;
-            }
-            this.node.setDirtyCanvas(true, true);
           }
-        }
-        remove();
-      };
-  
-      const remove = () => {
-        document.removeEventListener("click", outsideClick, true);
-        if (input.parentNode) {
-          input.parentNode.removeChild(input);
-        }
-      };
-  
-      const outsideClick = (evt) => {
-        if (evt.target !== input) {
-          commit();
-        }
-      };
-  
-      setTimeout(() => {
-        document.addEventListener("click", outsideClick, true);
-      }, 100);
-  
-      input.addEventListener("keydown", (evt) => {
-        if (evt.key === "Enter") {
-          evt.preventDefault();
-          commit();
-        } else if (evt.key === "Escape") {
-          evt.preventDefault();
           remove();
-        }
-      });
-  }
-  
-  showEphemeralPopup(message, x, y) {
-      const popup = document.createElement("div");
-      popup.textContent = message;
-      popup.style.position = "fixed";
-      popup.style.left = x + "px";
-      popup.style.top = y + "px";
-      popup.style.padding = "6px 10px";
-      popup.style.fontSize = "12px";
-      popup.style.background = "#333";
-      popup.style.color = "#fff";
-      popup.style.border = "2px solid #4b3e72";
-      popup.style.borderRadius = "6px";
-      popup.style.zIndex = "999999";
-      document.body.appendChild(popup);
-  
-      setTimeout(() => {
-          if (popup.parentNode) {
-              popup.parentNode.removeChild(popup);
+        };
+    
+        const remove = () => {
+          document.removeEventListener("click", outsideClick, true);
+          if (input.parentNode) {
+            input.parentNode.removeChild(input);
           }
-      }, 2000);
-  }
-  
-  onValueChanged(index, val) {
-      let n = parseInt(val, 10) || 0;
-      n = this.clampValue(index, n);
-      this.node.properties.values[index] = n;
-      this.node.setDirtyCanvas(true, true);
-  }
-  
-  clampValue(index, val) {
-    const minVal = this.node.properties.intMin[index];
-    const maxVal = this.node.properties.intMax[index];
-    const originalVal = val;
-    if (typeof minVal === "number" && val < minVal) {
-        val = minVal;
+        };
+    
+        const outsideClick = (evt) => {
+          if (evt.target !== input) {
+            commit();
+          }
+        };
+    
+        setTimeout(() => {
+          document.addEventListener("click", outsideClick, true);
+        }, 100);
+    
+        input.addEventListener("keydown", (evt) => {
+          if (evt.key === "Enter") {
+            evt.preventDefault();
+            commit();
+          } else if (evt.key === "Escape") {
+            evt.preventDefault();
+            remove();
+          }
+        });
     }
-    if (typeof maxVal === "number" && val > maxVal) {
-        val = maxVal;
+    
+    showEphemeralPopup(message, x, y) {
+        const popup = document.createElement("div");
+        popup.textContent = message;
+        popup.style.position = "fixed";
+        popup.style.left = x + "px";
+        popup.style.top = y + "px";
+        popup.style.padding = "6px 10px";
+        popup.style.fontSize = "12px";
+        popup.style.background = "#333";
+        popup.style.color = "#fff";
+        popup.style.border = "2px solid #4b3e72";
+        popup.style.borderRadius = "6px";
+        popup.style.zIndex = "999999";
+        document.body.appendChild(popup);
+    
+        setTimeout(() => {
+            if (popup.parentNode) {
+                popup.parentNode.removeChild(popup);
+            }
+        }, 2000);
     }
-    if (val !== originalVal) {
-        const reason = (val === minVal) ? `Min (${minVal})` : `Max (${maxVal})`;
-        this.showEphemeralPopup(`Set value out of range. Using ${reason}`);
-    }
-    return val;
-}
-
 
     incrementValue(index) {
         const step = (this.node.properties.intSteps && this.node.properties.intSteps[index]) || 1;
