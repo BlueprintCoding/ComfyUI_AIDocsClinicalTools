@@ -52,21 +52,6 @@ class MultiIntNode {
             node.properties.intMax = [];
         }
         this.adjustArrays();
-
-        for (let i = 0; i < this.node.properties.activeCount; i++) {
-            const stepVal = this.node.properties.intSteps[i] || 1;
-
-            if (typeof this.node.properties.intMin[i] === "number") {
-                const oldMin = this.node.properties.intMin[i];
-                const newMin = stepVal * Math.round(oldMin / stepVal);
-                this.node.properties.intMin[i] = newMin;
-            }
-            if (typeof this.node.properties.intMax[i] === "number") {
-                const oldMax = this.node.properties.intMax[i];
-                const newMax = stepVal * Math.round(oldMax / stepVal);
-                this.node.properties.intMax[i] = newMax;
-            }
-        }
     
         if (typeof node.properties.bottomPadding !== "number") {
             node.properties.bottomPadding = 0;
@@ -625,21 +610,24 @@ drawGroupLabelRow(ctx, labelObj, margin, startY, rowBgWidth) {
 
     openGearPopup(e) {
         e.stopPropagation();
-        // Before actually showing the popup, force min/max to resnap to step.
+
         for (let i = 0; i < this.node.properties.activeCount; i++) {
             const stepVal = this.node.properties.intSteps[i] || 1;
-            if (typeof this.node.properties.intMin[i] === "number") {
-                const oldMin = this.node.properties.intMin[i];
-                const snappedMin = stepVal * Math.round(oldMin / stepVal);
-                this.node.properties.intMin[i] = snappedMin;
-            }
-            if (typeof this.node.properties.intMax[i] === "number") {
+            // If min is set, we respect the user's exact min.
+            // If max is set, we snap it from min (if min is a number).
+            if (typeof this.node.properties.intMin[i] === "number"
+                && typeof this.node.properties.intMax[i] === "number") {
+                const minVal = this.node.properties.intMin[i];
                 const oldMax = this.node.properties.intMax[i];
-                const snappedMax = stepVal * Math.round(oldMax / stepVal);
+                const snappedMax = minVal + (stepVal * Math.round((oldMax - minVal) / stepVal));
                 this.node.properties.intMax[i] = snappedMax;
             }
+            // If min is set but we do NOT forcibly snap it, we do nothing to the user’s intMin[i].
+            // If max is undefined or min is undefined, skip it altogether.
         }
-        let nodeElem = this.node.htmlElement;
+    
+        // Now open the gear popup UI
+        const nodeElem = this.node.htmlElement;
         if (!nodeElem) {
             this.createGearPopupFallback(e.clientX, e.clientY);
             return;
@@ -651,7 +639,7 @@ drawGroupLabelRow(ctx, labelObj, margin, startY, rowBgWidth) {
         popup.open(popupX, popupY);
         this.populateGearPopup(popup);
     }
-
+    
 // CHANGED populateGearPopup
 populateGearPopup(popup) {
     const content = popup.getContentContainer();
@@ -722,7 +710,8 @@ populateGearPopup(popup) {
     content.appendChild(stepsContainer);
 
     const stepsList = document.createElement("div");
-    stepsContainer.appendChild(stepsList);
+        stepsContainer.appendChild(stepsList);
+
 
     const updateStepInputs = () => {
         stepsList.innerHTML = '';
@@ -742,6 +731,7 @@ populateGearPopup(popup) {
             intLabel.style.marginRight = "5px";
             rowDiv.appendChild(intLabel);
 
+            // STEP
             const stepInput = document.createElement("input");
             stepInput.type = "number";
             stepInput.value = this.node.properties.intSteps[i] || 1;
@@ -756,6 +746,7 @@ populateGearPopup(popup) {
             stepInput.style.marginRight = "5px";
             rowDiv.appendChild(stepInput);
 
+            // MIN
             const minInput = document.createElement("input");
             minInput.type = "number";
             minInput.placeholder = "Min";
@@ -774,6 +765,7 @@ populateGearPopup(popup) {
             }
             rowDiv.appendChild(minInput);
 
+            // MAX
             const maxInput = document.createElement("input");
             maxInput.type = "number";
             maxInput.placeholder = "Max";
@@ -793,6 +785,32 @@ populateGearPopup(popup) {
 
             stepsList.appendChild(rowDiv);
 
+            // Helper to set the .step attribute and also set the "min" attribute
+            // so that the stepping base is userMin, not 0
+            const syncMinMaxStep = () => {
+                const currentStep = this.node.properties.intSteps[i] || 1;
+                // Set .step for minInput & maxInput
+                minInput.step = currentStep.toString();
+                maxInput.step = currentStep.toString();
+
+                // If the user typed a numeric min, set that as the input's .min attribute
+                // so that the stepping base is from min, not 0
+                const userMin = parseInt(minInput.value, 10);
+                if (!isNaN(userMin)) {
+                    // This ensures the arrow increments from userMin
+                    minInput.min = userMin.toString();
+                } else {
+                    // If min is cleared or invalid, remove the "min" attribute
+                    minInput.removeAttribute("min");
+                }
+            };
+
+            // On creation, call syncMinMaxStep once
+            syncMinMaxStep();
+
+            // ================ EVENT HANDLERS ================
+
+            // STEP CHANGED
             stepInput.addEventListener("change", () => {
                 const newStep = parseInt(stepInput.value, 10);
                 if (isNaN(newStep) || newStep < 1) {
@@ -801,70 +819,80 @@ populateGearPopup(popup) {
                 }
                 this.node.properties.intSteps[i] = newStep;
 
-                if (typeof this.node.properties.intMin[i] === "number") {
-                    const oldMin = this.node.properties.intMin[i];
-                    const steppedMin = newStep * Math.round(oldMin / newStep);
-                    if (steppedMin !== oldMin) {
-                        this.showEphemeralPopup(
-                            `Min not aligned with step. Using stepped value: ${steppedMin}`,
-                            stepInput.getBoundingClientRect().left,
-                            stepInput.getBoundingClientRect().top - 25
-                        );
-                    }
-                    this.node.properties.intMin[i] = steppedMin;
-                    minInput.value = steppedMin.toString();
-                }
+                // Sync .step attribute on min/max and update stepping base
+                syncMinMaxStep();
 
-                if (typeof this.node.properties.intMax[i] === "number") {
+                // We do NOT snap the Min itself; we leave the user's min alone.
+                // But if there is a max, we snap it from min as the base offset.
+                const curMin = this.node.properties.intMin[i];
+                if (typeof curMin === "number" && typeof this.node.properties.intMax[i] === "number") {
                     const oldMax = this.node.properties.intMax[i];
-                    const steppedMax = newStep * Math.round(oldMax / newStep);
-                    if (steppedMax !== oldMax) {
+                    const snappedMax = curMin + (newStep * Math.round((oldMax - curMin) / newStep));
+                    if (snappedMax !== oldMax) {
                         this.showEphemeralPopup(
-                            `Max not aligned with step. Using stepped value: ${steppedMax}`,
+                            `Max snapped to: ${snappedMax} (step from min=${curMin})`,
                             stepInput.getBoundingClientRect().left,
                             stepInput.getBoundingClientRect().top - 25
                         );
+                        this.node.properties.intMax[i] = snappedMax;
+                        maxInput.value = snappedMax.toString();
                     }
-                    this.node.properties.intMax[i] = steppedMax;
-                    maxInput.value = steppedMax.toString();
                 }
             });
 
+            // MIN CHANGED
             minInput.addEventListener("change", () => {
                 const val = parseInt(minInput.value, 10);
                 if (!isNaN(val)) {
-                    const stepVal = this.node.properties.intSteps[i] || 1;
-                    const steppedVal = stepVal * Math.round(val / stepVal);
-                    if (steppedVal !== val) {
-                        this.showEphemeralPopup(
-                            `Min not aligned with step. Using stepped value: ${steppedVal}`,
-                            minInput.getBoundingClientRect().left,
-                            minInput.getBoundingClientRect().top - 25
-                        );
+                    // Accept user’s min as typed
+                    this.node.properties.intMin[i] = val;
+                    // Update the .min attribute so the stepping base changes
+                    minInput.min = val.toString();
+
+                    // Then if there's a max, snap that from the new min
+                    if (typeof this.node.properties.intMax[i] === "number") {
+                        const oldMax = this.node.properties.intMax[i];
+                        const stepVal = this.node.properties.intSteps[i] || 1;
+                        const snappedMax = val + (stepVal * Math.round((oldMax - val) / stepVal));
+                        if (snappedMax !== oldMax) {
+                            this.showEphemeralPopup(
+                                `Max snapped to: ${snappedMax} (step from min=${val})`,
+                                minInput.getBoundingClientRect().left,
+                                minInput.getBoundingClientRect().top - 25
+                            );
+                            this.node.properties.intMax[i] = snappedMax;
+                            maxInput.value = snappedMax.toString();
+                        }
                     }
-                    this.node.properties.intMin[i] = steppedVal;
-                    minInput.value = steppedVal.toString();
                 } else {
+                    // if user clears it, we set intMin[i] = undefined
                     this.node.properties.intMin[i] = undefined;
+                    // remove stepping base
+                    minInput.removeAttribute("min");
                     minInput.value = "";
                 }
             });
 
+            // MAX CHANGED
             maxInput.addEventListener("change", () => {
                 const val = parseInt(maxInput.value, 10);
                 if (!isNaN(val)) {
                     const stepVal = this.node.properties.intSteps[i] || 1;
-                    const steppedVal = stepVal * Math.round(val / stepVal);
-                    if (steppedVal !== val) {
+                    const curMin = (typeof this.node.properties.intMin[i] === "number")
+                        ? this.node.properties.intMin[i]
+                        : 0; // If min is not set, treat 0 as base
+                    const snappedMax = curMin + (stepVal * Math.round((val - curMin) / stepVal));
+                    if (snappedMax !== val) {
                         this.showEphemeralPopup(
-                            `Max not aligned with step. Using stepped value: ${steppedVal}`,
+                            `Max snapped to: ${snappedMax} (step from min=${curMin})`,
                             maxInput.getBoundingClientRect().left,
                             maxInput.getBoundingClientRect().top - 25
                         );
                     }
-                    this.node.properties.intMax[i] = steppedVal;
-                    maxInput.value = steppedVal.toString();
+                    this.node.properties.intMax[i] = snappedMax;
+                    maxInput.value = snappedMax.toString();
                 } else {
+                    // Clear
                     this.node.properties.intMax[i] = undefined;
                     maxInput.value = "";
                 }

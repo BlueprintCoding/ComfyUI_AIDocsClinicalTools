@@ -57,23 +57,7 @@ class MultiFloatNodeAID {
             node.properties.floatPrecision = [];
         }
         this.adjustArrays();
-
-        // On load, snap any existing min/max to the step
-        for (let i = 0; i < this.node.properties.activeCount; i++) {
-            const stepVal = this.node.properties.floatSteps[i] || 0.1;
-
-            if (typeof this.node.properties.floatMin[i] === "number") {
-                const oldMin = this.node.properties.floatMin[i];
-                const newMin = stepVal * Math.round(oldMin / stepVal);
-                this.node.properties.floatMin[i] = newMin;
-            }
-            if (typeof this.node.properties.floatMax[i] === "number") {
-                const oldMax = this.node.properties.floatMax[i];
-                const newMax = stepVal * Math.round(oldMax / stepVal);
-                this.node.properties.floatMax[i] = newMax;
-            }
-        }
-
+        
         if (typeof node.properties.bottomPadding !== "number") {
             node.properties.bottomPadding = 0;
         }
@@ -660,20 +644,24 @@ class MultiFloatNodeAID {
 
     openGearPopup(e) {
         e.stopPropagation();
-
-        // Before opening the popup, snap min/max to step again
+    
+        // We'll leave Min exactly as the user typed it, and only snap Max from that Min.
         for (let i = 0; i < this.node.properties.activeCount; i++) {
             const stepVal = this.node.properties.floatSteps[i] || 0.1;
-            if (typeof this.node.properties.floatMin[i] === "number") {
-                const snappedMin = stepVal * Math.round(this.node.properties.floatMin[i] / stepVal);
-                this.node.properties.floatMin[i] = snappedMin;
+            const hasMin = (typeof this.node.properties.floatMin[i] === "number");
+            const hasMax = (typeof this.node.properties.floatMax[i] === "number");
+    
+            // If both min and max are defined, we snap max from min as the offset:
+            // newMax = min + step * round( (oldMax - min) / step )
+            if (hasMin && hasMax) {
+                const oldMin = this.node.properties.floatMin[i];
+                const oldMax = this.node.properties.floatMax[i];
+                const offsetMax = oldMin + (stepVal * Math.round((oldMax - oldMin) / stepVal));
+                this.node.properties.floatMax[i] = offsetMax;
             }
-            if (typeof this.node.properties.floatMax[i] === "number") {
-                const snappedMax = stepVal * Math.round(this.node.properties.floatMax[i] / stepVal);
-                this.node.properties.floatMax[i] = snappedMax;
-            }
+            // Otherwise, do nothing to the user's min or max if one is missing
         }
-
+    
         const nodeElem = this.node.htmlElement;
         if (!nodeElem) {
             this.createGearPopupFallback(e.clientX, e.clientY);
@@ -685,14 +673,13 @@ class MultiFloatNodeAID {
         const popup = new SettingsPopup(this.node);
         popup.open(popupX, popupY);
         this.populateGearPopup(popup);
-    }
+    }   
 
     createGearPopupFallback(x, y) {
         const popup = new SettingsPopup(this.node);
         popup.open(x, y);
         this.populateGearPopup(popup);
     }
-    
 
     populateGearPopup(popup) {
         const content = popup.getContentContainer();
@@ -762,197 +749,282 @@ class MultiFloatNodeAID {
         const stepsList = document.createElement("div");
         stepsContainer.appendChild(stepsList);
     
-        const updateStepInputs = () => {
-            stepsList.innerHTML = '';
-            for (let i = 0; i < this.node.properties.activeCount; i++) {
-                const rowDiv = document.createElement("div");
-                rowDiv.style.display = "flex";
-                rowDiv.style.justifyContent = "center";
-                rowDiv.style.alignItems = "center";
-                rowDiv.style.marginBottom = "5px";
-                rowDiv.style.paddingBottom = "2px";
-                rowDiv.style.borderBottom = "2px solid #262626";
-    
-                const floatLabel = document.createElement("span");
-                floatLabel.textContent = `f${i + 1}`;
-                floatLabel.style.color = "#fff";
-                floatLabel.style.fontSize = "14px";
-                floatLabel.style.marginRight = "5px";
-                rowDiv.appendChild(floatLabel);
-    
-                const precInput = document.createElement("input");
-                precInput.type = "number";
-                precInput.min = "1";
-                precInput.max = "5";
-                precInput.value = this.node.properties.floatPrecision[i] || 1;
-                precInput.placeholder = "Prec";
-                precInput.style.width = "40px";
-                precInput.style.fontSize = "12px";
-                precInput.style.background = "#333";
-                precInput.style.color = "#fff";
-                precInput.style.border = "2px solid #4b3e72";
-                precInput.style.borderRadius = "6px";
-                precInput.style.textAlign = "center";
-                precInput.style.marginRight = "5px";
-                rowDiv.appendChild(precInput);
-    
-                const stepInput = document.createElement("input");
-                stepInput.type = "number";
-                stepInput.value = this.node.properties.floatSteps[i] || 0.1;
-                stepInput.style.width = "60px";
-                stepInput.style.fontSize = "12px";
-                stepInput.style.background = "#333";
-                stepInput.style.color = "#fff";
-                stepInput.style.border = "2px solid #4b3e72";
-                stepInput.style.borderRadius = "6px";
-                stepInput.style.textAlign = "center";
-                stepInput.style.marginRight = "5px";
-                rowDiv.appendChild(stepInput);
-    
-                const minInput = document.createElement("input");
-                minInput.type = "number";
-                minInput.placeholder = "Min";
-                minInput.style.width = "70px";
-                minInput.style.fontSize = "12px";
-                minInput.style.background = "#333";
-                minInput.style.color = "#fff";
-                minInput.style.border = "2px solid #4b3e72";
-                minInput.style.borderRadius = "6px";
-                minInput.style.textAlign = "center";
-                minInput.style.marginRight = "5px";
-                if (typeof this.node.properties.floatMin[i] === "number") {
-                    minInput.value = this.node.properties.floatMin[i];
+    const updateStepInputs = () => {
+        stepsList.innerHTML = '';
+        for (let i = 0; i < this.node.properties.activeCount; i++) {
+            const rowDiv = document.createElement("div");
+            rowDiv.style.display = "flex";
+            rowDiv.style.justifyContent = "center";
+            rowDiv.style.alignItems = "center";
+            rowDiv.style.marginBottom = "5px";
+            rowDiv.style.paddingBottom = "2px";
+            rowDiv.style.borderBottom = "2px solid #262626";
+
+            // Label
+            const floatLabel = document.createElement("span");
+            floatLabel.textContent = `f${i + 1}`;
+            floatLabel.style.color = "#fff";
+            floatLabel.style.fontSize = "14px";
+            floatLabel.style.marginRight = "5px";
+            rowDiv.appendChild(floatLabel);
+
+            // Precision
+            const precInput = document.createElement("input");
+            precInput.type = "number";
+            precInput.min = "1";
+            precInput.max = "5";
+            precInput.value = this.node.properties.floatPrecision[i] || 1;
+            precInput.placeholder = "Prec";
+            precInput.style.width = "40px";
+            precInput.style.fontSize = "12px";
+            precInput.style.background = "#333";
+            precInput.style.color = "#fff";
+            precInput.style.border = "2px solid #4b3e72";
+            precInput.style.borderRadius = "6px";
+            precInput.style.textAlign = "center";
+            precInput.style.marginRight = "5px";
+            rowDiv.appendChild(precInput);
+
+            // Step
+            const stepInput = document.createElement("input");
+            stepInput.type = "number";
+            stepInput.value = this.node.properties.floatSteps[i] || 0.1;
+            stepInput.style.width = "60px";
+            stepInput.style.fontSize = "12px";
+            stepInput.style.background = "#333";
+            stepInput.style.color = "#fff";
+            stepInput.style.border = "2px solid #4b3e72";
+            stepInput.style.borderRadius = "6px";
+            stepInput.style.textAlign = "center";
+            stepInput.style.marginRight = "5px";
+            rowDiv.appendChild(stepInput);
+
+            // Min
+            const minInput = document.createElement("input");
+            minInput.type = "number";
+            minInput.placeholder = "Min";
+            minInput.style.width = "70px";
+            minInput.style.fontSize = "12px";
+            minInput.style.background = "#333";
+            minInput.style.color = "#fff";
+            minInput.style.border = "2px solid #4b3e72";
+            minInput.style.borderRadius = "6px";
+            minInput.style.textAlign = "center";
+            minInput.style.marginRight = "5px";
+            if (typeof this.node.properties.floatMin[i] === "number") {
+                minInput.value = this.node.properties.floatMin[i];
+            } else {
+                minInput.value = "";
+            }
+            rowDiv.appendChild(minInput);
+
+            // Max
+            const maxInput = document.createElement("input");
+            maxInput.type = "number";
+            maxInput.placeholder = "Max";
+            maxInput.style.width = "70px";
+            maxInput.style.fontSize = "12px";
+            maxInput.style.background = "#333";
+            maxInput.style.color = "#fff";
+            maxInput.style.border = "2px solid #4b3e72";
+            maxInput.style.borderRadius = "6px";
+            maxInput.style.textAlign = "center";
+            if (typeof this.node.properties.floatMax[i] === "number") {
+                maxInput.value = this.node.properties.floatMax[i];
+            } else {
+                maxInput.value = "";
+            }
+            rowDiv.appendChild(maxInput);
+
+            stepsList.appendChild(rowDiv);
+
+            // Helper to set .step on min/max, and also set minInput.min
+            // so that the browser uses that as the stepping base.
+            const syncMinMaxStep = () => {
+                let currentPrec = this.node.properties.floatPrecision[i] || 1;
+                let currentStep = parseFloat(
+                    (this.node.properties.floatSteps[i] || 0.1).toFixed(currentPrec)
+                );
+
+                // 1) set step for min/max
+                minInput.step = currentStep.toString();
+                maxInput.step = currentStep.toString();
+
+                // 2) set min attribute on minInput if user typed a numeric min
+                const userMin = parseFloat(minInput.value);
+                if (!isNaN(userMin)) {
+                    minInput.min = userMin.toString();
                 } else {
+                    minInput.removeAttribute("min");
+                }
+            };
+
+            // On creation, call it once
+            syncMinMaxStep();
+
+            // ================= EVENT HANDLERS =================
+
+            // Precision changed
+            precInput.addEventListener("change", () => {
+                let newPrec = parseInt(precInput.value, 10);
+                if (isNaN(newPrec) || newPrec < 1) newPrec = 1;
+                if (newPrec > 5) newPrec = 5;
+                precInput.value = newPrec;
+                this.node.properties.floatPrecision[i] = newPrec;
+
+                // Snap step to new precision
+                let oldStep = parseFloat(stepInput.value);
+                if (isNaN(oldStep) || oldStep <= 0) oldStep = 0.1;
+                let stepVal = parseFloat(oldStep.toFixed(newPrec));
+                if (stepVal <= 0) stepVal = 0.1;
+                stepInput.value = stepVal;
+                this.node.properties.floatSteps[i] = stepVal;
+
+                // Resync step + min attribute
+                syncMinMaxStep();
+
+                // Snap max from min if both exist
+                if (typeof this.node.properties.floatMin[i] === "number"
+                    && typeof this.node.properties.floatMax[i] === "number") {
+                    const oldMax = this.node.properties.floatMax[i];
+                    const offsetMin = this.node.properties.floatMin[i];
+                    let newMax = offsetMin + (stepVal * Math.round((oldMax - offsetMin) / stepVal));
+                    newMax = parseFloat(newMax.toFixed(newPrec));
+                    if (newMax !== oldMax) {
+                        this.showEphemeralPopup(
+                            `Max snapped to: ${newMax} (step from min=${offsetMin})`,
+                            precInput.getBoundingClientRect().left,
+                            precInput.getBoundingClientRect().top - 25
+                        );
+                        this.node.properties.floatMax[i] = newMax;
+                        maxInput.value = newMax.toString();
+                    }
+                }
+
+                // Also snap the current value
+                let oldVal = this.node.properties.values[i];
+                let newVal = stepVal * Math.round(oldVal / stepVal);
+                newVal = parseFloat(newVal.toFixed(newPrec));
+                newVal = this.clampValue(i, newVal);
+                this.node.properties.values[i] = newVal;
+
+                this.node.setDirtyCanvas(true, true);
+            });
+
+            // Step changed
+            stepInput.addEventListener("change", () => {
+                const newStepRaw = parseFloat(stepInput.value);
+                if (isNaN(newStepRaw) || newStepRaw <= 0) {
+                    stepInput.value = this.node.properties.floatSteps[i] || 0.1;
+                    return;
+                }
+                const decimals = this.node.properties.floatPrecision[i] || 1;
+                const stepVal = parseFloat(newStepRaw.toFixed(decimals));
+                stepInput.value = stepVal;
+                this.node.properties.floatSteps[i] = stepVal;
+
+                // Resync step + min attribute
+                syncMinMaxStep();
+
+                // If we have both min and max, snap the max from min
+                if (typeof this.node.properties.floatMin[i] === "number"
+                    && typeof this.node.properties.floatMax[i] === "number") {
+                    const oldMax = this.node.properties.floatMax[i];
+                    const offsetMin = this.node.properties.floatMin[i];
+                    let newMax = offsetMin + (stepVal * Math.round((oldMax - offsetMin) / stepVal));
+                    newMax = parseFloat(newMax.toFixed(decimals));
+                    if (newMax !== oldMax) {
+                        this.showEphemeralPopup(
+                            `Max snapped to: ${newMax} (step from min=${offsetMin})`,
+                            stepInput.getBoundingClientRect().left,
+                            stepInput.getBoundingClientRect().top - 25
+                        );
+                        this.node.properties.floatMax[i] = newMax;
+                        maxInput.value = newMax.toString();
+                    }
+                }
+
+                // Snap the current value
+                let oldVal = this.node.properties.values[i];
+                let newVal = stepVal * Math.round(oldVal / stepVal);
+                newVal = parseFloat(newVal.toFixed(decimals));
+                newVal = this.clampValue(i, newVal);
+                this.node.properties.values[i] = newVal;
+
+                this.node.setDirtyCanvas(true, true);
+            });
+
+            // Min changed
+            minInput.addEventListener("change", () => {
+                const val = parseFloat(minInput.value);
+                const decimals = this.node.properties.floatPrecision[i] || 1;
+                const stepVal = this.node.properties.floatSteps[i] || 0.1;
+
+                if (!isNaN(val)) {
+                    const newMin = parseFloat(val.toFixed(decimals));
+                    this.node.properties.floatMin[i] = newMin;
+                    minInput.value = newMin.toString();
+
+                    // Also set minInput.min so the arrow stepping starts at newMin
+                    minInput.min = newMin.toString();
+
+                    // If max is defined, snap it from the new min
+                    if (typeof this.node.properties.floatMax[i] === "number") {
+                        const oldMax = this.node.properties.floatMax[i];
+                        let newMax = newMin + (stepVal * Math.round((oldMax - newMin) / stepVal));
+                        newMax = parseFloat(newMax.toFixed(decimals));
+                        if (newMax !== oldMax) {
+                            this.showEphemeralPopup(
+                                `Max snapped to: ${newMax} (step from min=${newMin})`,
+                                minInput.getBoundingClientRect().left,
+                                minInput.getBoundingClientRect().top - 25
+                            );
+                            this.node.properties.floatMax[i] = newMax;
+                            maxInput.value = newMax.toString();
+                        }
+                    }
+                } else {
+                    // Clear min
+                    this.node.properties.floatMin[i] = undefined;
+                    minInput.removeAttribute("min");
                     minInput.value = "";
                 }
-                rowDiv.appendChild(minInput);
-    
-                const maxInput = document.createElement("input");
-                maxInput.type = "number";
-                maxInput.placeholder = "Max";
-                maxInput.style.width = "70px";
-                maxInput.style.fontSize = "12px";
-                maxInput.style.background = "#333";
-                maxInput.style.color = "#fff";
-                maxInput.style.border = "2px solid #4b3e72";
-                maxInput.style.borderRadius = "6px";
-                maxInput.style.textAlign = "center";
-                if (typeof this.node.properties.floatMax[i] === "number") {
-                    maxInput.value = this.node.properties.floatMax[i];
+                this.node.setDirtyCanvas(true, true);
+            });
+
+            // Max changed
+            maxInput.addEventListener("change", () => {
+                const val = parseFloat(maxInput.value);
+                const decimals = this.node.properties.floatPrecision[i] || 1;
+                const stepVal = this.node.properties.floatSteps[i] || 0.1;
+                const offsetMin = (typeof this.node.properties.floatMin[i] === "number")
+                    ? this.node.properties.floatMin[i]
+                    : 0;
+
+                if (!isNaN(val)) {
+                    let newMax = offsetMin + (stepVal * Math.round((val - offsetMin) / stepVal));
+                    newMax = parseFloat(newMax.toFixed(decimals));
+                    if (newMax !== val) {
+                        this.showEphemeralPopup(
+                            `Max snapped to: ${newMax} (step from min=${offsetMin})`,
+                            maxInput.getBoundingClientRect().left,
+                            maxInput.getBoundingClientRect().top - 25
+                        );
+                    }
+                    this.node.properties.floatMax[i] = newMax;
+                    maxInput.value = newMax.toString();
                 } else {
+                    // Clear max
+                    this.node.properties.floatMax[i] = undefined;
                     maxInput.value = "";
                 }
-                rowDiv.appendChild(maxInput);
-    
-                stepsList.appendChild(rowDiv);
-    
-                precInput.addEventListener("change", () => {
-                    let newPrec = parseInt(precInput.value, 10);
-                    if (isNaN(newPrec) || newPrec < 1) newPrec = 1;
-                    if (newPrec > 5) newPrec = 5;
-                    precInput.value = newPrec;
-                    this.node.properties.floatPrecision[i] = newPrec;
-    
-                    let oldStep = parseFloat(stepInput.value);
-                    if (isNaN(oldStep) || oldStep <= 0) oldStep = 0.1;
-                    let stepVal = parseFloat(oldStep.toFixed(newPrec));
-                    if (stepVal <= 0) stepVal = 0.1;
-                    stepInput.value = stepVal;
-                    this.node.properties.floatSteps[i] = stepVal;
-    
-                    if (typeof this.node.properties.floatMin[i] === "number") {
-                        const oldMin = this.node.properties.floatMin[i];
-                        let snappedMin = stepVal * Math.round(oldMin / stepVal);
-                        snappedMin = parseFloat(snappedMin.toFixed(newPrec));
-                        this.node.properties.floatMin[i] = snappedMin;
-                        minInput.value = snappedMin.toString();
-                    }
-    
-                    if (typeof this.node.properties.floatMax[i] === "number") {
-                        const oldMax = this.node.properties.floatMax[i];
-                        let snappedMax = stepVal * Math.round(oldMax / stepVal);
-                        snappedMax = parseFloat(snappedMax.toFixed(newPrec));
-                        this.node.properties.floatMax[i] = snappedMax;
-                        maxInput.value = snappedMax.toString();
-                    }
-    
-                    let oldVal = this.node.properties.values[i];
-                    let newVal = stepVal * Math.round(oldVal / stepVal);
-                    newVal = parseFloat(newVal.toFixed(newPrec));
-                    newVal = this.clampValue(i, newVal);
-                    this.node.properties.values[i] = newVal;
-                    this.node.setDirtyCanvas(true, true);
-                });
-    
-                stepInput.addEventListener("change", () => {
-                    const newStep = parseFloat(stepInput.value);
-                    if (isNaN(newStep) || newStep <= 0) {
-                        stepInput.value = this.node.properties.floatSteps[i] || 0.1;
-                        return;
-                    }
-                    const decimals = this.node.properties.floatPrecision[i] || 1;
-                    const stepVal = parseFloat(newStep.toFixed(decimals));
-                    stepInput.value = stepVal;
-                    this.node.properties.floatSteps[i] = stepVal;
-    
-                    if (typeof this.node.properties.floatMin[i] === "number") {
-                        const oldMin = this.node.properties.floatMin[i];
-                        let steppedMin = stepVal * Math.round(oldMin / stepVal);
-                        steppedMin = parseFloat(steppedMin.toFixed(decimals));
-                        this.node.properties.floatMin[i] = steppedMin;
-                        minInput.value = steppedMin.toString();
-                    }
-    
-                    if (typeof this.node.properties.floatMax[i] === "number") {
-                        const oldMax = this.node.properties.floatMax[i];
-                        let steppedMax = stepVal * Math.round(oldMax / stepVal);
-                        steppedMax = parseFloat(steppedMax.toFixed(decimals));
-                        this.node.properties.floatMax[i] = steppedMax;
-                        maxInput.value = steppedMax.toString();
-                    }
-    
-                    let oldVal = this.node.properties.values[i];
-                    let newVal = stepVal * Math.round(oldVal / stepVal);
-                    newVal = parseFloat(newVal.toFixed(decimals));
-                    newVal = this.clampValue(i, newVal);
-                    this.node.properties.values[i] = newVal;
-                    this.node.setDirtyCanvas(true, true);
-                });
-    
-                minInput.addEventListener("change", () => {
-                    const val = parseFloat(minInput.value);
-                    if (!isNaN(val)) {
-                        const decimals = this.node.properties.floatPrecision[i] || 1;
-                        const stepVal = this.node.properties.floatSteps[i] || 0.1;
-                        let steppedVal = stepVal * Math.round(val / stepVal);
-                        steppedVal = parseFloat(steppedVal.toFixed(decimals));
-                        this.node.properties.floatMin[i] = steppedVal;
-                        minInput.value = steppedVal.toString();
-                    } else {
-                        this.node.properties.floatMin[i] = undefined;
-                        minInput.value = "";
-                    }
-                    this.node.setDirtyCanvas(true, true);
-                });
-    
-                maxInput.addEventListener("change", () => {
-                    const val = parseFloat(maxInput.value);
-                    if (!isNaN(val)) {
-                        const decimals = this.node.properties.floatPrecision[i] || 1;
-                        const stepVal = this.node.properties.floatSteps[i] || 0.1;
-                        let steppedVal = stepVal * Math.round(val / stepVal);
-                        steppedVal = parseFloat(steppedVal.toFixed(decimals));
-                        this.node.properties.floatMax[i] = steppedVal;
-                        maxInput.value = steppedVal.toString();
-                    } else {
-                        this.node.properties.floatMax[i] = undefined;
-                        maxInput.value = "";
-                    }
-                    this.node.setDirtyCanvas(true, true);
-                });
-            }
-        };
-        updateStepInputs();
+            this.node.setDirtyCanvas(true, true);
+        });
+    }
+};
+updateStepInputs();
+
+
     
         // Create a title for the color section
         const colorSectionTitle = document.createElement("div");
