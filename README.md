@@ -19,6 +19,19 @@ The **MultiInt** node allows you to manage multiple integer outputs (up to 20) w
 
 This node is ideal when you need to setup multiple numeric parameters (such as thresholds, counts, or configuration numbers) through a single node saving space.
 
+### Multi Float Node
+![image](https://github.com/user-attachments/assets/926d5647-5df6-4962-97a4-ec6f02eff835)
+
+
+The **Multi Float** node allows you to manage multiple float outputs (up to 20) within a single node. Each integer has its own:
+- **Label:** A custom string (e.g., "Frames", "Steps", etc.) that identifies the input.
+- **Value:** The current float value.
+- **Step:** A configurable increment/decrement step value. You can adjust the step individually for each float.
+- **Control Buttons:** Plus and minus buttons allow users to increment or decrement the values. In addition, you can adjust values via dragging (by clicking and holding on the float value) or inline editing (by clicking on the pencil).
+- **Settings:** Configure default parameters such as the background color, button colors, and step values.
+
+This node is ideal when you need to setup multiple numeric float parameters (such as thresholds, counts, or configuration numbers) through a single node saving space.
+
 ### MultiText Node
 ![image](https://github.com/user-attachments/assets/cb64eabe-69b1-4c27-aa03-6a88ccc4723d)
 
