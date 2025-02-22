@@ -1,4 +1,5 @@
 {
     "Multi Text": "Convenient way to manage multiple prompts or text strings in a singular node",
-    "Multi Int": "Allows the creation of up to 20 ints from one node with: custom step amounts per int, clicking edit pencil allows to set any value, clicking and dragging on int allows fast change by step, +- buttons step by the set value."
+    "Multi Int": "Allows the creation of up to 20 ints from one node with: custom step amounts per int, clicking edit pencil allows to set any value, clicking and dragging on int allows fast change by step, +- buttons step by the set value.",
+    "Multi Float": "Allows the creation of up to 20 floats from one node with: custom step amounts per float, clicking edit pencil allows to set any value, clicking and dragging on float allows fast change by step, +- buttons step by the set value."
 }

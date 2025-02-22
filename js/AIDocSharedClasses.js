@@ -9,7 +9,7 @@ export class SettingsPopup {
         // Root popup
         this.popupElement = document.createElement("div");
         this.popupElement.style.position = "fixed";
-        this.popupElement.style.width = "250px";
+        this.popupElement.style.width = "350px";
         this.popupElement.style.background = "#181818";
         this.popupElement.style.border = "2px solid #4b3e72";
         this.popupElement.style.borderRadius = "6px";
@@ -21,7 +21,7 @@ export class SettingsPopup {
 
         // Header
         this.headerElement = document.createElement("div");
-        this.headerElement.textContent = "Multi Int Node Settings";
+        this.headerElement.textContent = "Multi Node Settings";
         this.headerElement.style.width = "100%";
         this.headerElement.style.color = "#fff";
         this.headerElement.style.fontSize = "14px";
