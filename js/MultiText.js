@@ -412,21 +412,23 @@ const MultiTextNode = {
         const separator = ComfyWidgets["STRING"](this, "separator", ["STRING", { 
             default: " ",
             visible: false,
-            forceInput: true
+            hidden: true,
         }], app);
         const active = ComfyWidgets["BOOLEAN"](this, "active", ["BOOLEAN", { 
             default: true,
-            visible: false 
+            visible: false,
+            hidden: true, 
         }], app);
 
         if (separator?.widget) {
-            separator.widget.computeSize = () => [0, -4];
             separator.widget.hidden = true;
+            separator.widget.computeSize = () => [0, -4];            
             this.separator = separator;
         }
         if (active?.widget) {
-            active.widget.computeSize = () => [0, -4];
             active.widget.hidden = true;
+            active.widget.computeSize = () => [0, -4];
+            
         }
 
         this.serialize_widgets = true;

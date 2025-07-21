@@ -3,15 +3,8 @@ class MultiText:
     @classmethod
     def INPUT_TYPES(s):
         return {
-            "required": {
-                "separator": ("STRING", {
-                    "default": " ",
-                    "multiline": False,
-                    "hidden": True,
-                    "forceInput": True
-                }),
-                "active": ("BOOLEAN", {"default": True, "hidden": True}),
-            },
+        "required": {
+        },
             "hidden": {
                 **{f"enabled{i}": ("BOOLEAN", {"default": True}) for i in range(1, 21)},
                 **{f"text{i}": ("STRING", {"multiline": True}) for i in range(1, 21)},
@@ -20,7 +13,18 @@ class MultiText:
                     "min": 0.0,
                     "max": 2.0,
                     "step": 0.1
-                }) for i in range(1, 21)}
+                }) for i in range(1, 21)},
+                **{"separator": ("STRING", {
+                "default": " ",
+                "multiline": False,
+                "visible": False,
+                "widget": "hidden"
+            })},
+            **{"active": ("BOOLEAN", {
+                "default": True,
+                "visible": False,
+                "widget": "hidden"
+            })},
             }
         }
     

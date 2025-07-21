@@ -11,7 +11,6 @@ class MultiInt:
                     "max": 2147483647,
                     "step": 1,
                     "hide": True,       # hidden by default, the JS can show them
-                    "forceInput": True,
                 },
             )
             for i in range(20)

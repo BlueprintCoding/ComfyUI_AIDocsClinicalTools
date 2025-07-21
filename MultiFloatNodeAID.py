@@ -11,7 +11,6 @@ class MultiFloatNodeAID:
                     "max": 3.4e38,     # or another large positive float if needed
                     "step": 0.1,       # default step for float
                     "hide": True,
-                    "forceInput": True,
                 },
             )
             for i in range(20)

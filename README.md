@@ -1,3 +1,6 @@
+### MOST RECENT UPDATE 7/21/2025
+Please note this most recent update may make the multi-text node forget the titles and text values for your nodes. Please make a backup of your node before updating.
+
 # ComfyUI_AIDocsClinicalTools
  The AI Doctors Custom ComfyUI Nodes
 
